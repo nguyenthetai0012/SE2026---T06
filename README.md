@@ -60,4 +60,3 @@ Tài liệu do nhóm cung cấp:
 
 Các tài liệu nguồn chưa được đưa vào repo tại thời điểm soạn README.
 
-**APP-05 là dự án nhóm độc lập với bài cá nhân RE-022/R22.** Không áp dụng các ràng buộc 267 người dùng, lưu dữ liệu 26 ngày, phản hồi thay đổi trong 10 giờ hoặc chỉ deploy cuối tuần cho dự án nhóm.
