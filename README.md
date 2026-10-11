@@ -35,6 +35,30 @@ MQTT, Node/Python, time-series DB và web UI được tài liệu liệt kê là
 
 Hai tài liệu có ví dụ payload và topic khác nhau; các ví dụ chưa được chọn làm contract chính thức.
 
+## Phân công và kế hoạch ban đầu
+
+> Tài liệu `APP05_PhanCong_Theo_CauTruc_Repo_KetHop_CapNhat.docx` đề xuất phân công dưới đây. Nhóm cần xác nhận trước khi xem đây là phân công chính thức:
+
+| Thành viên | Vai trò đề xuất | Khu vực chính |
+| --- | --- | --- |
+| Tài — TV1 | Backend & API | `src/backend/`, API registry/history/alerts và API/contract tests |
+| Sương — TV2 | Frontend & Dashboard | `src/frontend/`, dashboard, lịch sử, alerts/offline và E2E tests |
+| An — TV3 | IoT, Simulator & Data | `src/simulator/`, MQTT/data flow, contract và dữ liệu trễ/sai thứ tự |
+| Ngọc — TV4 | Quality, Security & DevOps | CI, test strategy, load/integration quality, scripts, Docker và release checklist |
+
+Tài liệu cũng đưa ra kế hoạch 8 sprint một tuần làm mốc lập kế hoạch ban đầu. Đây là lịch đề xuất để nhóm điều chỉnh, không phải cam kết tiến độ:
+
+1. **Foundation:** nền tảng repo và luồng chạy tối thiểu.
+2. **MQTT path:** simulator, MQTT, ingestion và lưu readings.
+3. **Registry & Queries:** quản lý thiết bị và truy vấn lịch sử.
+4. **Dashboard MVP:** tổng quan, danh sách thiết bị và lịch sử.
+5. **Alerts & Offline:** cảnh báo và trạng thái thiết bị.
+6. **Reliability & Security:** dữ liệu trễ/sai thứ tự, bảo mật và khôi phục.
+7. **Load & Release:** đo tải và chuẩn bị phát hành.
+8. **Hardening & Demo:** ổn định, UAT, tài liệu và demo; desktop PoC là tùy chọn.
+
+Các đầu việc chi tiết, tiêu chí tải, ngưỡng cảnh báo và quyết định kỹ thuật trong tài liệu cần được nhóm xác nhận qua Issue/PR trước khi triển khai.
+
 ## Cách làm việc
 
 Quy trình đề xuất trong cẩm nang để nhóm duyệt:
@@ -55,8 +79,9 @@ Chưa có hướng dẫn chạy vì chưa có implementation và stack được 
 
 Tài liệu do nhóm cung cấp:
 
+- `APP05_PhanCong_Theo_CauTruc_Repo_KetHop_CapNhat.docx`: bản đồ trách nhiệm theo repo và kế hoạch 8 sprint đề xuất; nội dung đã được tóm tắt ở trên và cần nhóm xác nhận.
 - `APP05_KeHoach_TrienKhai_ChiTiet.docx`: mục 2.1 về đề tài; các phần thiết kế và backlog là đề xuất.
 - `APP-05_Huong-dan-phoi-hop-ChatGPT-Codex-GitHub.docx`: bảng thông tin đề tài và cẩm nang cộng tác.
 
-Các tài liệu nguồn chưa được đưa vào repo tại thời điểm soạn README.
+Các tài liệu nguồn được cung cấp ngoài repo; README tách yêu cầu đã xác nhận khỏi phân công, lịch và thiết kế còn cần nhóm duyệt.
 
