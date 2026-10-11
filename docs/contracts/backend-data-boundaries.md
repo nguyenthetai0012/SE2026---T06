@@ -60,3 +60,22 @@ Chưa có bằng chứng thống nhất hoặc review của thành viên khác t
 | Review thành viên khác | Chưa có | Bổ sung liên kết review PR sau khi thực hiện |
 
 Sau khi duyệt: ghi kết luận và bằng chứng, cập nhật các tài liệu liên quan, rồi mới mô tả contract cụ thể và triển khai. Các mục chưa thống nhất vẫn giữ trạng thái mở.
+
+## Nội dung phối hợp để hoàn tất Issue #2
+
+[PR #7](https://github.com/nguyenthetai0012/SE2026---T06/pull/7) là nơi rà soát hai tài liệu này. Phần dưới chuẩn bị câu hỏi; chưa phải ghi nhận trao đổi đã diễn ra.
+
+**An (#3):** xác nhận các thông tin khái niệm đầu vào đã đủ cho Simulator; bổ sung liên kết schema/payload hợp lệ và không hợp lệ; thống nhất xử lý thiết bị lạ, giao lại, timestamp tương lai, đến trễ và sai thứ tự. Chỉ rõ bản tin nào được tính là tín hiệu sống.
+
+**Sương (#4):** xác nhận bảng năng lực API đáp ứng từng màn hình; chỉ rõ các chỉ số tổng quan và đơn vị, khoảng thời gian, yêu cầu raw/aggregate và cập nhật; rà soát trạng thái rỗng, thiếu dữ liệu, lỗi tải, chưa có tín hiệu và offline. Cần phân biệt công suất tức thời với điện năng tiêu thụ.
+
+**Ngọc (#5):** rà soát AC-01…AC-11 trong tài liệu architecture; chỉ rõ fixture, cách đo và các tham số còn cần duyệt. Sau khi có quyết định nhóm, chuyển thành ca kiểm thử; hiện chưa có test thực thi.
+
+Mẫu ghi nhận phản hồi cho từng quyết định:
+- ID quyết định hoặc tiêu chí được rà soát.
+- Nội dung đồng ý hoặc sửa đổi cụ thể.
+- Người xác nhận và liên kết comment/review.
+- File/phiên bản contract liên quan.
+- Mục còn mở và ảnh hưởng tới việc triển khai.
+
+Không ghi “đã thống nhất” nếu chưa có phản hồi. Các quyết định công nghệ có thể theo dõi riêng; issue #2 có thể hoàn tất phần yêu cầu sau khi phạm vi, luồng, contract cần thiết và review được xác nhận, không nhất thiết phải chọn toàn bộ stack trong issue này.
