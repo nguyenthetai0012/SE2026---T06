@@ -18,7 +18,18 @@ Trong phạm vi Issue #4, Dashboard cần hỗ trợ:
 
 Tài liệu này không chọn framework giao diện, cơ sở dữ liệu, giao thức, cách tính bất thường, đơn vị đo hoặc chính sách thời gian thực.
 
-## 2. Luồng người dùng chính
+## 2. Yêu cầu theo màn hình
+
+| Màn hình | Mục đích | Dữ liệu cần hiển thị ở mức yêu cầu | Tiêu chí nghiệm thu liên quan |
+| --- | --- | --- | --- |
+| Tổng quan theo tòa nhà | Giúp người dùng so sánh và chọn tòa nhà cần xem chi tiết. | Tên/định danh tòa nhà; giá trị năng lượng được nguồn dữ liệu cung cấp; đơn vị và khoảng thời gian tương ứng; trạng thái độ mới nếu nguồn cung cấp. Không tự tính tổng khi chưa có công thức được duyệt. | AC-01; điều hướng sang danh sách/chi tiết tòa nhà theo FLOW-01. |
+| Danh sách thiết bị | Giúp người dùng tìm thiết bị trong toàn khuôn viên hoặc tòa nhà và nhận biết trạng thái kết nối. | Tên/định danh thiết bị; tòa nhà liên quan; trạng thái online/offline do nguồn dữ liệu cung cấp; lần liên lạc gần nhất nếu contract có trường này. | AC-02, AC-05, AC-11. |
+| Chi tiết cảm biến và lịch sử | Giúp người dùng xem diễn biến phép đo và tra cứu theo thời gian. | Thiết bị/cảm biến được chọn; loại phép đo; các điểm dữ liệu gồm thời điểm đo, giá trị và đơn vị theo contract; khoảng truy vấn; dấu hiệu dữ liệu cũ/đến trễ nếu nguồn cung cấp. | AC-03, AC-06, AC-10. |
+| Cảnh báo | Giúp người dùng xem bất thường do hệ thống đã phát hiện và xác định đối tượng liên quan. | Thông tin cảnh báo do Backend cung cấp; tối thiểu liên kết được với thiết bị hoặc tòa nhà nếu có trong contract, cùng thời điểm và mô tả có sẵn. Mức độ/ trạng thái chỉ hiển thị nếu nhóm thống nhất và nguồn cung cấp. | AC-04; điều hướng tới thiết bị/tòa nhà liên quan nếu được hỗ trợ. |
+
+Các tên trường cụ thể, công thức năng lượng, mức độ cảnh báo và tiêu chí freshness/offline tiếp tục chờ contract/decisions được nhóm duyệt; bảng này không tự định nghĩa schema.
+
+## 3. Luồng người dùng chính
 
 ### FLOW-01 — Xem tổng quan theo tòa nhà
 
@@ -56,19 +67,19 @@ Dashboard trong phạm vi này hiển thị cảnh báo đã được tạo; tà
 3. Dashboard gửi yêu cầu và hiển thị các bản ghi trả về cùng dấu thời gian, giá trị và đơn vị sẵn có.
 4. Nếu không có bản ghi phù hợp, Dashboard hiển thị trạng thái không có dữ liệu cho điều kiện đã chọn.
 
-## 3. Trạng thái giao diện cần xử lý
+## 4. Trạng thái giao diện cần xử lý
 
 | Trạng thái | Cách Dashboard cần thể hiện |
 | --- | --- |
 | Đang tải | Cho biết nội dung đang được tải; không hiển thị nhầm trạng thái rỗng trước khi có kết quả. |
 | Không có dữ liệu | Nêu rõ phạm vi/điều kiện đang xem không có bản ghi; phân biệt với lỗi tải dữ liệu. |
-| Lỗi tải dữ liệu | Báo rằng dữ liệu không tải được; không trình bày lỗi như kết quả rỗng. Có thao tác thử tải lại nếu phù hợp với luồng đã duyệt. |
+| Lỗi tải dữ liệu | Báo rằng dữ liệu không tải được; không trình bày lỗi như kết quả rỗng. Có thao tác thử tải lại yêu cầu hiện tại. |
 | Dữ liệu cũ/đến trễ | Gắn dấu hiệu dễ nhận biết vào dữ liệu bị đánh dấu cũ hoặc đến trễ; giữ thông tin thời gian có trong contract và không trình bày dữ liệu đó như vừa cập nhật. |
 | Thiết bị offline | Gắn trạng thái offline với đúng thiết bị và tòa nhà; không đồng nhất offline với lỗi tải trang hoặc không có dữ liệu lịch sử. |
 
 Ngưỡng xác định dữ liệu cũ, cách nhận biết dữ liệu đến trễ, thời điểm dùng để sắp xếp và điều kiện xác định thiết bị offline cần được nhóm chốt trong contract hoặc quyết định liên quan. Giao diện sử dụng trạng thái do nguồn dữ liệu đã thống nhất cung cấp.
 
-## 4. Tiêu chí nghiệm thu
+## 5. Tiêu chí nghiệm thu
 
 Có thể kiểm tra các tiêu chí dưới đây bằng bộ dữ liệu kiểm thử có kiểm soát. Tên trường và giá trị cụ thể phải theo contract được nhóm duyệt; không suy ra schema mới từ tài liệu này.
 
@@ -82,12 +93,12 @@ Có thể kiểm tra các tiêu chí dưới đây bằng bộ dữ liệu kiể
 | AC-06 | Khi tra cứu một đối tượng trong một khoảng thời gian, Dashboard không hiển thị bản ghi ngoài điều kiện truy vấn và gắn đúng bản ghi trả về với đối tượng tương ứng. |
 | AC-07 | Khi yêu cầu còn đang chờ phản hồi, Dashboard thể hiện trạng thái đang tải; trạng thái này kết thúc khi nhận được kết quả hoặc lỗi. |
 | AC-08 | Khi truy vấn thành công nhưng trả về danh sách rỗng, Dashboard hiển thị trạng thái không có dữ liệu và phạm vi truy vấn; không hiển thị thông báo lỗi tải dữ liệu. |
-| AC-09 | Khi truy vấn thất bại, Dashboard hiển thị trạng thái lỗi thay vì trạng thái rỗng. Nếu có thao tác tải lại, thao tác đó gửi lại truy vấn hiện tại. |
+| AC-09 | Khi truy vấn thất bại, Dashboard hiển thị trạng thái lỗi thay vì trạng thái rỗng và có thao tác thử lại. Khi người dùng thử lại, Dashboard gửi lại cùng truy vấn và điều kiện hiện tại. |
 | AC-10 | Khi fixture đánh dấu dữ liệu là cũ hoặc đến trễ theo trạng thái đã thống nhất, Dashboard thể hiện nhãn tương ứng trên dữ liệu đó và giữ thời gian nguồn cung cấp; dữ liệu không bị trình bày như bản cập nhật mới nhất. |
 | AC-11 | Trạng thái offline của thiết bị được hiển thị độc lập với trạng thái tải dữ liệu của Dashboard; lỗi tải dữ liệu không tự biến thành nhãn thiết bị offline và ngược lại. |
 | AC-12 | Với cùng dữ liệu đầu vào, các giá trị trên tổng quan, dữ liệu theo thời gian, cảnh báo và lịch sử luôn gắn với đúng tòa nhà/thiết bị; không trộn dữ liệu giữa các đối tượng. |
 
-## 5. Các điểm cần nhóm xác nhận
+## 6. Các điểm cần nhóm xác nhận
 
 Để hoàn thiện contract và giao diện, nhóm cần thống nhất:
 
