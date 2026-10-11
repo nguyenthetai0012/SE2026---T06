@@ -1,0 +1,23 @@
+# Build output
+build/
+dist/
+target/
+coverage/
+
+# Dependency directories and local tool caches
+node_modules/
+vendor/
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
