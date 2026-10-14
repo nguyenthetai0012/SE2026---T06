@@ -1,19 +1,23 @@
-# Yêu cầu & Quy tắc giả lập dữ liệu (Simulator Requirements)
+```markdown
+# Yêu cầu & Quy tắc giả lập dữ liệu (Simulator Requirements) - Draft
 
-**Mục đích:** Mô tả hành vi của Simulator, đặc biệt tập trung vào việc phát sinh các ca kiểm thử dữ liệu bất thường để Backend và QA đối chiếu.
+**Mục đích:** Mô tả Simulator như một nguồn tạo dữ liệu và fixtures có thể tái lập để Backend và QA kiểm thử. 
 
-## 1. Giả lập dữ liệu đến trễ (Late Data)
-*   **Định nghĩa:** Bản tin có `event_time` (thời điểm đo) nhỏ hơn `received_at` (thời điểm server nhận) vượt quá một khoảng thời gian cho phép (ví dụ: trễ quá 5 phút).
-*   **Cách Simulator giả lập:** Simulator vẫn gửi bản tin vào thời điểm hiện tại, nhưng chủ động gán giá trị `event_time` lùi lại 1 tiếng trước trong quá khứ.
-*   **Kỳ vọng xử lý:** Backend vẫn tiếp nhận, nhưng đánh dấu là dữ liệu trễ và đưa vào báo cáo lịch sử thay vì kích hoạt cảnh báo thời gian thực.
+## 1. Dữ liệu hợp lệ (Valid Fixtures)
+*   Simulator cung cấp dữ liệu hợp lệ cho nhiều building và device tuân thủ nghiêm ngặt theo MQTT Schema sau khi được nhóm duyệt.
 
-## 2. Giả lập dữ liệu sai thứ tự (Out-of-order Data)
-*   **Định nghĩa:** Bản tin được gửi/nhận không theo đúng trình tự thời gian thực tế xảy ra.
-*   **Cách Simulator giả lập:** 
-    *   Gửi Bản tin A: `event_time` = 08:05:00Z.
-    *   Sau đó gửi Bản tin B: `event_time` = 08:00:00Z (Xảy ra trước A nhưng gửi sau).
-*   **Kỳ vọng xử lý:** Cơ sở dữ liệu chuỗi thời gian (Time-series DB) phải sắp xếp lại đúng theo `event_time` để khi truy vấn lịch sử, đồ thị không bị gấp khúc sai lệch.
+## 2. Fixtures dữ liệu đến trễ (Late Data)
+*   **Mô tả:** Gửi bản tin ở thời điểm hiện tại nhưng gán giá trị `event_time` lùi về quá khứ. (Ví dụ: lùi 1 giờ chỉ để phục vụ mục đích tái lập kiểm thử, đây không phải là ngưỡng chính thức của hệ thống).
+*   **Đề xuất xử lý:** Backend phân biệt được dữ liệu trễ dựa vào chênh lệch giữa `event_time` và `received_at`. Chính sách có kích hoạt cảnh báo hay không đối với dữ liệu trễ sẽ được thống nhất riêng.
 
-## 3. Trùng lặp dữ liệu (Duplicate Data)
-*   **Cách Simulator giả lập:** Gửi đi gửi lại 2 bản tin có cùng giá trị `message_id`.
-*   **Kỳ vọng xử lý:** Backend chỉ xử lý/lưu trữ bản tin đầu tiên và bỏ qua bản tin thứ hai.
+## 3. Fixtures dữ liệu sai thứ tự (Out-of-order Data)
+*   **Mô tả:** Bản tin được gửi không theo trình tự thời gian. Ví dụ: Gửi Bản tin A (`event_time` = 08:05:00Z), sau đó gửi Bản tin B (`event_time` = 08:00:00Z).
+*   **Đề xuất xử lý:** Backend giữ lại cả hai reading. Khi truy vấn lịch sử, kết quả được sắp xếp đúng theo `event_time` (Không bắt buộc phải dùng Time-series DB cụ thể, miễn đáp ứng logic truy vấn này).
+
+## 4. Fixtures trùng lặp dữ liệu (Duplicate Data)
+*   **Mô tả:** Simulator gửi lại một payload có cùng `message_id` nhiều lần.
+*   **Đề xuất xử lý:** Backend xử lý theo cơ chế idempotent (chỉ ghi nhận giá trị 1 lần, các lần gửi sau bị bỏ qua).
+
+## 5. Fixtures không hợp lệ (Invalid Data)
+*   **Mô tả:** Thiếu trường, sai kiểu, timestamp sai định dạng, ID không tồn tại.
+*   **Kỳ vọng:** Backend phân biệt được bản tin bị từ chối với bản tin được chấp nhận.
