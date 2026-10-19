@@ -184,6 +184,7 @@ Các vấn đề sau cần được thống nhất trước khi hoàn thiện k�
 
 Tài liệu này là đề xuất ban đầu và cần được cập nhật khi các yêu cầu và hợp đồng dữ liệu được phê duyệt.
 
+
 - Các tình huống liên quan đến Backend cần được Tài rà soát.
 - Các tình huống liên quan đến Simulator và việc tạo dữ liệu cần được An rà soát.
 - Nhóm cần xác nhận phạm vi kiểm thử, tiêu chí nghiệm thu và phương án CI trước khi triển khai.
