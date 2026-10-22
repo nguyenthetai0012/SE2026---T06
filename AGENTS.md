@@ -97,10 +97,10 @@ Mọi Agent khi thực hiện tác vụ liên quan đến Issue phải tuân th�
 
 ---
 
-## 4. Quy ước Kỹ thuật & Chuẩn Dữ liệu
+## 4. Quy ước kỹ thuật và dữ liệu
 
-* **Chuẩn Thời gian:** Sử dụng định dạng **ISO-8601 UTC** (ví dụ: `2026-10-14T09:25:00Z`).
-* **Đơn vị đo lường:** Điện năng tiêu thụ dùng `kWh`, Công suất tiêu thụ dùng `kW`.
-* **Định danh:** Đồng bộ quy cách đặt tên cho `building_id`, `device_id`.
-* **Xử lý Bất thường (Edge Cases):** Mã nguồn xử lý dữ liệu cảm biến phải tính đến các tình huống: dữ liệu trùng lặp, dữ liệu gửi trễ (late data), gửi sai thứ tự (out-of-order) hoặc thiết bị mất kết nối (offline status).
-```
+- README và các contract/ADR đã được nhóm duyệt là nguồn quyết định kỹ thuật hiện hành. Nội dung được đánh dấu **đề xuất**, **bản nháp** hoặc **còn mở** không phải quy tắc bắt buộc.
+- Ví dụ ISO-8601 UTC, metric `power_kw`/`energy_kwh`, đơn vị kW/kWh trong tài liệu hiện tại chỉ là ví dụ/đề xuất cho đến khi nhóm phê duyệt contract tương ứng.
+- Khi nhóm đã duyệt quy ước thời gian, đơn vị và định danh trong contract, mọi thành phần phải tuân thủ cùng một quy ước; không tự thêm quy ước mới.
+- Khi triển khai, phải tính đến các trường hợp được xác nhận trong yêu cầu và contract: dữ liệu trùng, đến trễ, sai thứ tự và thiết bị offline. Chính sách cụ thể phải lấy từ quyết định đã duyệt, không tự suy diễn từ ví dụ.
+
