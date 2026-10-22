@@ -1,23 +1,27 @@
-```markdown
-# Yêu cầu & Quy tắc giả lập dữ liệu (Simulator Requirements) - Draft
+# Yêu cầu và quy tắc giả lập dữ liệu (Simulator Requirements) — Draft
 
-**Mục đích:** Mô tả Simulator như một nguồn tạo dữ liệu và fixtures có thể tái lập để Backend và QA kiểm thử. 
+**Mục đích:** Mô tả Simulator như nguồn dữ liệu và fixtures có thể tái lập để Backend và QA kiểm thử.
 
-## 1. Dữ liệu hợp lệ (Valid Fixtures)
-*   Simulator cung cấp dữ liệu hợp lệ cho nhiều building và device tuân thủ nghiêm ngặt theo MQTT Schema sau khi được nhóm duyệt.
+## 1. Dữ liệu hợp lệ
 
-## 2. Fixtures dữ liệu đến trễ (Late Data)
-*   **Mô tả:** Gửi bản tin ở thời điểm hiện tại nhưng gán giá trị `event_time` lùi về quá khứ. (Ví dụ: lùi 1 giờ chỉ để phục vụ mục đích tái lập kiểm thử, đây không phải là ngưỡng chính thức của hệ thống).
-*   **Đề xuất xử lý:** Backend phân biệt được dữ liệu trễ dựa vào chênh lệch giữa `event_time` và `received_at`. Chính sách có kích hoạt cảnh báo hay không đối với dữ liệu trễ sẽ được thống nhất riêng.
+Simulator cần tạo dữ liệu hợp lệ cho nhiều tòa nhà và thiết bị theo MQTT schema sau khi nhóm duyệt. Schema và metric cụ thể vẫn là đề xuất cho đến khi được xác nhận.
 
-## 3. Fixtures dữ liệu sai thứ tự (Out-of-order Data)
-*   **Mô tả:** Bản tin được gửi không theo trình tự thời gian. Ví dụ: Gửi Bản tin A (`event_time` = 08:05:00Z), sau đó gửi Bản tin B (`event_time` = 08:00:00Z).
-*   **Đề xuất xử lý:** Backend giữ lại cả hai reading. Khi truy vấn lịch sử, kết quả được sắp xếp đúng theo `event_time` (Không bắt buộc phải dùng Time-series DB cụ thể, miễn đáp ứng logic truy vấn này).
+## 2. Dữ liệu đến trễ
 
-## 4. Fixtures trùng lặp dữ liệu (Duplicate Data)
-*   **Mô tả:** Simulator gửi lại một payload có cùng `message_id` nhiều lần.
-*   **Đề xuất xử lý:** Backend xử lý theo cơ chế idempotent (chỉ ghi nhận giá trị 1 lần, các lần gửi sau bị bỏ qua).
+- **Fixture:** Gửi bản tin ở thời điểm hiện tại nhưng đặt `event_time` lùi về quá khứ. Ví dụ lùi một giờ chỉ để tái lập kiểm thử, không phải ngưỡng chính thức.
+- **Ý nghĩa:** `event_time` là lúc cảm biến đo; `received_at` là lúc Backend nhận và tự ghi nhận.
+- **Chính sách:** Cách xử lý dữ liệu trễ, ngưỡng nhận diện và ảnh hưởng tới cảnh báo còn chờ nhóm thống nhất.
 
-## 5. Fixtures không hợp lệ (Invalid Data)
-*   **Mô tả:** Thiếu trường, sai kiểu, timestamp sai định dạng, ID không tồn tại.
-*   **Kỳ vọng:** Backend phân biệt được bản tin bị từ chối với bản tin được chấp nhận.
+## 3. Dữ liệu sai thứ tự
+
+- **Fixture:** Gửi bản tin A với `event_time` = 08:05:00Z, sau đó gửi bản tin B với `event_time` = 08:00:00Z.
+- **Đề xuất:** Giữ cả hai reading; khi truy vấn lịch sử, sắp xếp theo `event_time`. Đây là yêu cầu hành vi đề xuất, không yêu cầu một loại cơ sở dữ liệu cụ thể.
+
+## 4. Dữ liệu trùng lặp
+
+- **Fixture:** Gửi lại payload có cùng `message_id`.
+- **Đề xuất chờ xác nhận:** Backend xử lý idempotent để chỉ ghi nhận một lần. Tài/An cần xác nhận khóa nhận diện và hành vi cụ thể.
+
+## 5. Dữ liệu không hợp lệ
+
+Tạo fixtures cho các trường hợp thiếu trường, sai kiểu dữ liệu, timestamp sai định dạng và ID không có trong registry. Kết quả mong đợi là Backend phân biệt được bản tin bị từ chối với bản tin được chấp nhận; cách phản hồi chi tiết cần theo contract Backend đã duyệt.
