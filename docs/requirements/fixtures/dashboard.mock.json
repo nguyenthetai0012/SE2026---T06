@@ -17,7 +17,7 @@
       "buildingId": "BLD-B",
       "buildingName": "Building B (mock)",
       "energySummary": {
-        "value": 92.0,
+        "value": 92,
         "unit": "kWh (provisional example)",
         "period": {
           "start": "2026-10-21T00:00:00Z",
@@ -95,6 +95,53 @@
       "deviceId": "METER-B-01",
       "occurredAt": "2026-10-22T07:45:00Z",
       "description": "Mock alert supplied by the source; no detection threshold is implied."
+    }
+  ],
+  "queryScenarios": [
+    {
+      "scenario": "loading",
+      "notice": "MOCK UI state only; not an API response.",
+      "query": {
+        "deviceId": "METER-A-01",
+        "period": {
+          "start": "2026-10-22T07:00:00Z",
+          "end": "2026-10-22T08:10:00Z"
+        }
+      },
+      "status": "loading"
+    },
+    {
+      "scenario": "success-empty",
+      "notice": "MOCK UI state only; not an API response.",
+      "query": {
+        "deviceId": "METER-A-01",
+        "period": {
+          "start": "2026-10-22T09:00:00Z",
+          "end": "2026-10-22T10:00:00Z"
+        }
+      },
+      "status": "success",
+      "readings": []
+    },
+    {
+      "scenario": "error-retry",
+      "notice": "MOCK UI state only; retry repeats the same query filters.",
+      "query": {
+        "deviceId": "METER-A-01",
+        "period": {
+          "start": "2026-10-22T07:00:00Z",
+          "end": "2026-10-22T08:10:00Z"
+        }
+      },
+      "status": "error",
+      "canRetry": true,
+      "retryQuery": {
+        "deviceId": "METER-A-01",
+        "period": {
+          "start": "2026-10-22T07:00:00Z",
+          "end": "2026-10-22T08:10:00Z"
+        }
+      }
     }
   ]
 }
