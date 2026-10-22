@@ -1,0 +1,147 @@
+{
+  "_notice": "MOCK ONLY — frontend view-model example, not an API response or MQTT contract. All IDs, values, units, metric names and timestamps are synthetic and provisional.",
+  "buildingOverview": [
+    {
+      "buildingId": "BLD-A",
+      "buildingName": "Building A (mock)",
+      "energySummary": {
+        "value": 135.4,
+        "unit": "kWh (provisional example)",
+        "period": {
+          "start": "2026-10-21T00:00:00Z",
+          "end": "2026-10-22T00:00:00Z"
+        }
+      }
+    },
+    {
+      "buildingId": "BLD-B",
+      "buildingName": "Building B (mock)",
+      "energySummary": {
+        "value": 92,
+        "unit": "kWh (provisional example)",
+        "period": {
+          "start": "2026-10-21T00:00:00Z",
+          "end": "2026-10-22T00:00:00Z"
+        }
+      }
+    }
+  ],
+  "devices": [
+    {
+      "deviceId": "METER-A-01",
+      "deviceName": "Meter A-01 (mock)",
+      "buildingId": "BLD-A",
+      "connectionStatus": "online",
+      "lastSeen": "2026-10-22T07:59:50Z"
+    },
+    {
+      "deviceId": "METER-A-02",
+      "deviceName": "Meter A-02 (mock)",
+      "buildingId": "BLD-A",
+      "connectionStatus": "offline",
+      "lastSeen": "2026-10-22T06:40:00Z"
+    },
+    {
+      "deviceId": "METER-B-01",
+      "deviceName": "Meter B-01 (mock)",
+      "buildingId": "BLD-B",
+      "connectionStatus": "online",
+      "lastSeen": "2026-10-22T07:58:40Z"
+    }
+  ],
+  "history": {
+    "selectedDeviceId": "METER-A-01",
+    "queryPeriod": {
+      "start": "2026-10-22T07:00:00Z",
+      "end": "2026-10-22T08:10:00Z"
+    },
+    "readings": [
+      {
+        "buildingId": "BLD-A",
+        "deviceId": "METER-A-01",
+        "metric": "power_kw (provisional example)",
+        "value": 4.2,
+        "unit": "kW (provisional example)",
+        "event_time": "2026-10-22T07:00:00Z",
+        "received_at": "2026-10-22T07:00:02Z",
+        "freshness": "normal (mock)"
+      },
+      {
+        "buildingId": "BLD-A",
+        "deviceId": "METER-A-01",
+        "metric": "power_kw (provisional example)",
+        "value": 4.7,
+        "unit": "kW (provisional example)",
+        "event_time": "2026-10-22T08:05:00Z",
+        "received_at": "2026-10-22T08:05:02Z",
+        "freshness": "normal (mock)"
+      },
+      {
+        "buildingId": "BLD-A",
+        "deviceId": "METER-A-01",
+        "metric": "power_kw (provisional example)",
+        "value": 4.5,
+        "unit": "kW (provisional example)",
+        "event_time": "2026-10-22T08:02:00Z",
+        "received_at": "2026-10-22T08:06:00Z",
+        "freshness": "late (mock marker only)"
+      }
+    ]
+  },
+  "alerts": [
+    {
+      "alertId": "ALERT-MOCK-01",
+      "buildingId": "BLD-B",
+      "deviceId": "METER-B-01",
+      "occurredAt": "2026-10-22T07:45:00Z",
+      "description": "Mock alert supplied by the source; no detection threshold is implied."
+    }
+  ],
+  "queryScenarios": [
+    {
+      "scenario": "loading",
+      "notice": "MOCK UI state only; not an API response.",
+      "query": {
+        "deviceId": "METER-A-01",
+        "period": {
+          "start": "2026-10-22T07:00:00Z",
+          "end": "2026-10-22T08:10:00Z"
+        }
+      },
+      "status": "loading"
+    },
+    {
+      "scenario": "success-empty",
+      "notice": "MOCK UI state only; not an API response.",
+      "query": {
+        "deviceId": "METER-A-01",
+        "period": {
+          "start": "2026-10-22T09:00:00Z",
+          "end": "2026-10-22T10:00:00Z"
+        }
+      },
+      "status": "success",
+      "readings": []
+    },
+    {
+      "scenario": "error-retry",
+      "notice": "MOCK UI state only; retry repeats the same query filters.",
+      "query": {
+        "deviceId": "METER-A-01",
+        "period": {
+          "start": "2026-10-22T07:00:00Z",
+          "end": "2026-10-22T08:10:00Z"
+        }
+      },
+      "status": "error",
+      "canRetry": true,
+      "retryQuery": {
+        "deviceId": "METER-A-01",
+        "period": {
+          "start": "2026-10-22T07:00:00Z",
+          "end": "2026-10-22T08:10:00Z"
+        }
+      }
+    }
+  ]
+}
