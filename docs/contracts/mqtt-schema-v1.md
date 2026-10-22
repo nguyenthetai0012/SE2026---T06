@@ -1,22 +1,30 @@
 # MQTT Reading Schema — Draft Proposal v1
 
-**Mục đích:** Định nghĩa cấu trúc chuẩn cho dữ liệu cảm biến (payload) được gửi từ Simulator qua MQTT Broker. 
+**Mục đích:** Đề xuất cấu trúc dữ liệu cảm biến (payload) được gửi từ Simulator qua MQTT Broker.
 
-## 1. Các trường dữ liệu (Fields)
-*   `schema_version` (String): Phiên bản của schema (hiện tại là "1.0").
-*   `message_id` (String): Mã định danh duy nhất của bản tin (dùng để chống trùng lặp dữ liệu/deduplication).
-*   `building_id` (String): Mã định danh tòa nhà (VD: "BLD-A").
-*   `device_id` (String): Mã định danh thiết bị cảm biến (VD: "METER-01").
-*   `event_time` (String): Thời điểm đo thực tế tại cảm biến, định dạng ISO-8601 UTC. *(Lưu ý: Trường này khác với `received_at` - là thời điểm Backend tự ghi nhận khi nhận được bản tin, không nằm trong payload này).*
-*   `metric` (String): Loại thông số đo (VD: "power_kw", "energy_kwh").
-*   `value` (Float): Giá trị đo lường (là số hữu hạn).
+## 1. Các trường dữ liệu đề xuất
 
-## 2. Đề xuất quy tắc ánh xạ Đơn vị (Metric to Unit Mapping)
-Để Dashboard có thể hiển thị chính xác theo yêu cầu, đề xuất quy tắc ánh xạ sau:
-*   Nếu `metric` là `power_kw` -> Đơn vị hiển thị: `kW`
-*   Nếu `metric` là `energy_kwh` -> Đơn vị hiển thị: `kWh`
+Các trường dưới đây là đề xuất ban đầu. Nhóm cần xác nhận trường nào bắt buộc, tập giá trị hợp lệ và quy tắc validation trước khi dùng schema làm contract được duyệt.
 
-## 3. Ví dụ Payload hợp lệ (Valid Payload)
+- `schema_version` (String): phiên bản schema (ví dụ: "1.0").
+- `message_id` (String): mã định danh bản tin; đề xuất dùng để nhận diện bản tin trùng.
+- `building_id` (String): mã tòa nhà (ví dụ: "BLD-A").
+- `device_id` (String): mã thiết bị cảm biến (ví dụ: "METER-01").
+- `event_time` (String): thời điểm cảm biến đo, định dạng ISO-8601 UTC.
+- `metric` (String): loại thông số đo (ví dụ: "power_kw", "energy_kwh").
+- `value` (Number): giá trị đo hữu hạn, không phải NaN hoặc vô cực.
+
+`received_at` là thời điểm Backend nhận bản tin và do Backend ghi nhận; trường này không nằm trong payload Simulator.
+
+## 2. Đề xuất ánh xạ metric sang đơn vị
+
+Đây là đề xuất để Dashboard có ví dụ hiển thị; danh sách metric/đơn vị cần nhóm xác nhận.
+
+- `power_kw` → `kW`
+- `energy_kwh` → `kWh`
+
+## 3. Ví dụ payload hợp lệ
+
 ```json
 {
   "schema_version": "1.0",
@@ -28,7 +36,21 @@
   "value": 45.5
 }
 ```
-## 4. Xử lý Payload KHÔNG hợp lệ (Invalid Payload)
-Ca kiểm thử: Thiếu trường bắt buộc (không có message_id, event_time), sai kiểu dữ liệu, định dạng timestamp sai, hoặc định danh không có trong registry.
 
-Đề xuất hành vi: Backend sẽ từ chối bản tin này và không cung cấp nó như một reading hợp lệ trong lịch sử (Cách phản hồi/lưu log chẩn đoán nội bộ sẽ do Backend quyết định).
+## 4. Ví dụ payload không hợp lệ
+
+Ví dụ này sai kiểu dữ liệu: `value` được gửi dưới dạng chuỗi, trong khi trường được đề xuất là một số hữu hạn. Ví dụ chỉ minh họa lỗi kiểu dữ liệu, chưa quyết định danh sách trường bắt buộc.
+
+```json
+{
+  "schema_version": "1.0",
+  "message_id": "msg-12346-invalid",
+  "building_id": "BLD-A",
+  "device_id": "METER-01",
+  "event_time": "2026-10-13T08:01:00Z",
+  "metric": "power_kw",
+  "value": "45.5"
+}
+```
+
+**Hành vi đề xuất:** Backend từ chối bản tin không hợp lệ và không đưa nó vào lịch sử như một reading hợp lệ. Cách phản hồi/lưu log chẩn đoán nội bộ cần được xác nhận theo thiết kế Backend.
