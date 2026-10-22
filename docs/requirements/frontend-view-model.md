@@ -51,9 +51,9 @@ Bảng trên là mô hình hành vi UI theo AC-07…AC-11, không quy định c�
 | AC-04 | Một cảnh báo gắn đúng building và device. |
 | AC-05 | Có thiết bị mock online và offline; UI hiển thị đúng trạng thái do fixture cung cấp. |
 | AC-06 | Có nhiều thời điểm đo để kiểm tra phạm vi thời gian; quy tắc biên vẫn chờ contract. |
-| AC-07 | Dùng trạng thái truy vấn loading; đây là kịch bản UI, không phải bản ghi trong fixture dữ liệu. |
-| AC-08 | Dùng kết quả thành công rỗng và hiển thị phạm vi truy vấn. |
-| AC-09 | Dùng kết quả lỗi và kiểm tra retry giữ nguyên điều kiện. |
+| AC-07 | Dùng kịch bản `loading` trong `queryScenarios`; đây là trạng thái UI mock, không phải API response. |
+| AC-08 | Dùng kịch bản `success-empty` trong `queryScenarios` và hiển thị phạm vi truy vấn. |
+| AC-09 | Dùng kịch bản `error-retry` trong `queryScenarios` và kiểm tra retry lặp lại cùng bộ lọc truy vấn. |
 | AC-10 | Một reading được đánh dấu late trong mock để kiểm tra nhãn; không hàm ý ngưỡng chính thức. |
 | AC-11 | Giữ offline status riêng với lỗi truy vấn và dữ liệu lịch sử rỗng. |
 | AC-12 | Dùng ID liên kết xuyên suốt overview, devices, history và alert để kiểm tra không trộn đối tượng. |
