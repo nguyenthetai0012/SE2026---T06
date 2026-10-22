@@ -232,12 +232,14 @@ Contract chỉ đóng issue #2 khi các mục dưới đây được xác nhận
 
 ### 4.1 Sương (@transuong630-web) — đối chiếu Dashboard
 
-- [ ] 2.1 đủ cho FLOW-01, AC-01, AC-12: giá trị + đơn vị + khoảng; Frontend không tự cộng.
-- [ ] 2.2 đủ cho FLOW-02, AC-02, AC-05, AC-11: danh sách theo phạm vi, offline do Backend, không nhầm với lỗi tải.
-- [ ] 2.3 đủ cho FLOW-03, FLOW-05, AC-03, AC-06, AC-10: lọc theo thời điểm đo, có thể hiện cũ/trễ khi nguồn cung cấp.
-- [ ] 2.4 đủ cho FLOW-04, AC-04; đồng ý MVP **không** đóng/xác nhận cảnh báo.
-- [ ] 2.5 đủ cho AC-07, AC-08, AC-09: có data / rỗng / lỗi + retry cùng điều kiện.
-- [ ] Không thiếu dữ liệu so với bảng màn hình trong `docs/requirements/dashboard.md`.
+**Xác nhận phía Dashboard — Sương, 2026-10-22:** Sáu mục dưới đây được xác nhận ở mức nhu cầu hiển thị và hành vi, đối chiếu FLOW-01–05, AC-01–12 của `dashboard.md`. Sương đồng ý MVP chỉ xem cảnh báo, chưa cần thao tác đóng/xác nhận. Đây không phải phê duyệt toàn bộ API/schema hoặc các quyết định Q1–Q14; phần phụ thuộc MQTT, Backend và kiểm thử vẫn cần người phụ trách xác nhận. Retry giữ nguyên đối tượng, khoảng thời gian và bộ lọc; kết quả có thể thay đổi khi Backend nhận thêm dữ liệu, không yêu cầu hai lần trả dữ liệu giống hệt.
+
+- [x] 2.1 đủ cho FLOW-01, AC-01, AC-12: giá trị + đơn vị + khoảng; Frontend không tự cộng.
+- [x] 2.2 đủ cho FLOW-02, AC-02, AC-05, AC-11: danh sách theo phạm vi, offline do Backend, không nhầm với lỗi tải.
+- [x] 2.3 đủ cho FLOW-03, FLOW-05, AC-03, AC-06, AC-10: lọc theo thời điểm đo, có thể hiện cũ/trễ khi nguồn cung cấp.
+- [x] 2.4 đủ cho FLOW-04, AC-04; đồng ý MVP **không** đóng/xác nhận cảnh báo.
+- [x] 2.5 đủ cho AC-07, AC-08, AC-09: có data / rỗng / lỗi + retry cùng điều kiện.
+- [x] Không thiếu dữ liệu so với bảng màn hình trong `docs/requirements/dashboard.md`.
 
 ### 4.2 An (@NguyenThaiAn2810) — MQTT, timestamp, chu kỳ gửi
 
