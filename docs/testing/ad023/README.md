@@ -11,7 +11,11 @@
 | C2 | `9444acd` | refactor thuần | Tách `EnergyQueryPort`; SQL về Ingestion; gom logic tổng hợp. **Không sửa file test nào** |
 | C3 | `76f7104` | fitness test | Luật kiến trúc R1–R4: 4 vi phạm trên C1, 0 trên C2 |
 | C4 | `0f46e2a` | sửa lỗi (đổi hành vi có chủ đích) | Phân quyền theo tòa nhà (BOLA), bỏ payload thô, audit; +10 test bảo mật |
-| C5 | commit chứa file này | evidence | Script benchmark, kết quả đo, tài liệu |
+| C5 | `f197a0e` | evidence | Script benchmark, kết quả đo |
+| C6 | `727114d` | tính năng (biến cố AD-023) | Batch theo phân vùng: cô lập lỗi, đối soát, khôi phục từng phần, giới hạn 49 ngày; luật R3/R5 |
+| C7a | `f706376` | test trước khi sửa | Chốt biên cờ `late` (300 s / 301 s / qua nửa đêm) |
+| C7 | `b569723` | refactor hiệu năng (giữ hành vi) | `strptime` → `fromisoformat`; không sửa file test |
+| C8 | commit chứa file này | evidence | Đo tải 302 tác vụ đồng thời, cập nhật tài liệu |
 
 Kiểm tra "C2 không sửa test": `git diff --stat 4662872 9444acd -- tests` → rỗng.
 
@@ -33,6 +37,7 @@ Từ thư mục gốc repo, Python ≥ 3.10, không cần cài thêm thư viện
 python -m unittest discover -s tests/ad023 -t . -v     # 26 test
 python -m tests.ad023.test_architecture                # luật R1–R4
 python tools/scripts/ad023_bench.py --out /tmp/b.json  # benchmark (~6 s seed)
+python tools/scripts/ad023_load.py --pool 4            # 302 tác vụ đồng thời (~15 s/lần)
 ```
 
 Chạy luật kiến trúc trên baseline:
@@ -44,7 +49,7 @@ AD023_SRC=/tmp/c1/src/backend/ad023 python -m tests.ad023.test_architecture
 
 ## 4. Kết quả đã ghi
 
-**Test** (Python 3.13.17, 25/10/2026): C1 14/14, C2 14/14 (cùng file test), C3 16/16, C4 26/26.
+**Test** (Python 3.13.17, 25/10/2026): C1 14/14, C2 14/14 (cùng file test), C3 16/16, C4 26/26, C6 38/38, C7 39/39.
 
 **Luật kiến trúc:** [`results/architecture-c1-vs-c2.txt`](results/architecture-c1-vs-c2.txt).
 
@@ -58,6 +63,22 @@ AD023_SRC=/tmp/c1/src/backend/ad023 python -m tests.ad023.test_architecture
 Diễn giải:
 - **C1 → C2 không đổi hiệu năng** (nằm trong dao động giữa các lần chạy). Refactor qua port không thêm chi phí đáng kể, nhưng cũng không làm nhanh hơn.
 - **C4 nhanh hơn khoảng 40 lần ở tổng quan** vì đã bỏ truy vấn `raw_debug_records` (sắp xếp toàn bộ reading của tòa nhà theo `received_at`, không có index). Lợi ích này đến từ việc sửa P3, **không** đến từ refactor.
+
+**Biến cố batch (C6)** — `tests/ad023/test_batch_recovery.py`: bản phát hành lỗi làm sai im lặng BLD-B (×1000) và làm sập BLD-C. BLD-A vẫn publish đúng; BLD-C bị cách ly, giữ giá trị tốt cũ; `reconcile` trả `["BLD-B","BLD-C"]`; `recover` chỉ tính lại hai phân vùng đó (spy xác nhận BLD-A không bị tính lại, `run_id` giữ nguyên); quá 49 ngày thì từ chối khôi phục.
+
+**Tải 302 tác vụ đồng thời** (`tools/scripts/ad023_load.py`, mỗi tác vụ 1 luồng + 1 kết nối, quyền 1 tòa nhà; 9 request hợp lệ + 1 lần thử tòa nhà khác; batch lỗi BLD-03 chạy song song rồi được khôi phục; 3 lần chạy/cấu hình, 3.020 request/lần):
+
+| Cấu hình | Code | p95 | Đạt ≤ 1,5 s? | File |
+| --- | --- | --- | --- | --- |
+| Burst, không giới hạn kết nối | C7 | 2,40–2,50 s | Không | `load-burst-unbounded.json` |
+| Burst, pool 4 kết nối | C6 | 1,36–1,42 s | Sát ngưỡng | `load-burst-pool4-c6.json` |
+| Burst, pool 4 kết nối | C7 | 0,68–0,74 s | Có | `load-burst-pool4.json` |
+| Ổn định, think time TB 1 s, không giới hạn | C7 | 1,1–1,5 ms | Có | `load-steady-unbounded.json` |
+| Ổn định, think time TB 1 s, pool 4 | C7 | 1,1–2,0 ms | Có | `load-steady-pool4.json` |
+
+Ở **mọi** lần chạy: 302/302 lần truy cập trái phép bị từ chối, 0 lần lộ dữ liệu, 0 lỗi khác; batch phát hiện 30/300 phân vùng sai, khôi phục 30, còn 0 sai sau khôi phục (chỉ tính lại 10% số phân vùng).
+
+Kết luận: mục tiêu p95 ≤ 1,5 s chỉ đạt khi **giới hạn số truy vấn đồng thời** (pool) hoặc tải có think time; burst không giới hạn trên 2 vCPU vượt mục tiêu. Đây là evidence trigger trong ADR của bài.
 
 ## 5. Giới hạn — không dùng các số này cho
 

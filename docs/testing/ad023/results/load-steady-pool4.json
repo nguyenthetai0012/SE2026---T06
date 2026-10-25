@@ -1,0 +1,101 @@
+{
+  "scenario": "302 concurrent tasks, 1 building scope each, 1 cross-building attempt each, batch with one faulty building running concurrently then recovered",
+  "args": {
+    "out": "docs/testing/ad023/results/load-steady-pool4.json",
+    "runs": 3,
+    "no_batch": false,
+    "pool": 4,
+    "think_ms": 1000
+  },
+  "target": {
+    "concurrent_tasks": 302,
+    "p95_ms_max": 1500
+  },
+  "dataset": {
+    "readings": 288000,
+    "buildings": 10,
+    "devices": 100,
+    "days": 30
+  },
+  "environment": {
+    "python": "3.13.17",
+    "sqlite": "3.53.1",
+    "cpus": 2,
+    "store": "SQLite file, WAL, one connection per task",
+    "scope": "in-process service calls; no HTTP, MQTT or PostgreSQL"
+  },
+  "runs": [
+    {
+      "requests": 3020,
+      "p50_ms": 0.69,
+      "p95_ms": 2.01,
+      "p99_ms": 62.93,
+      "max_ms": 183.77,
+      "meets_p95_target": true,
+      "unauthorized_attempts": 302,
+      "denied": 302,
+      "leaked": 0,
+      "errors": 0,
+      "wall_s": 15.58,
+      "batch": {
+        "partitions": 300,
+        "faulty_run_s": 0.377,
+        "bad_partitions_found": 30,
+        "recovered_partitions": 30,
+        "recovery_s": 0.345,
+        "bad_after_recovery": 0
+      },
+      "with_batch": true,
+      "pool_size": 4,
+      "think_ms_mean": 1000
+    },
+    {
+      "requests": 3020,
+      "p50_ms": 0.55,
+      "p95_ms": 1.07,
+      "p99_ms": 2.29,
+      "max_ms": 8.21,
+      "meets_p95_target": true,
+      "unauthorized_attempts": 302,
+      "denied": 302,
+      "leaked": 0,
+      "errors": 0,
+      "wall_s": 15.57,
+      "batch": {
+        "partitions": 300,
+        "faulty_run_s": 0.329,
+        "bad_partitions_found": 30,
+        "recovered_partitions": 30,
+        "recovery_s": 0.279,
+        "bad_after_recovery": 0
+      },
+      "with_batch": true,
+      "pool_size": 4,
+      "think_ms_mean": 1000
+    },
+    {
+      "requests": 3020,
+      "p50_ms": 0.57,
+      "p95_ms": 1.26,
+      "p99_ms": 24.63,
+      "max_ms": 212.58,
+      "meets_p95_target": true,
+      "unauthorized_attempts": 302,
+      "denied": 302,
+      "leaked": 0,
+      "errors": 0,
+      "wall_s": 15.56,
+      "batch": {
+        "partitions": 300,
+        "faulty_run_s": 0.278,
+        "bad_partitions_found": 30,
+        "recovered_partitions": 30,
+        "recovery_s": 0.25,
+        "bad_after_recovery": 0
+      },
+      "with_batch": true,
+      "pool_size": 4,
+      "think_ms_mean": 1000
+    }
+  ]
+}
