@@ -34,7 +34,7 @@ class SqliteEnergyQuery:
             (device_id, window.start, window.end)).fetchall()
         return [ReadingView(*row) for row in rows]
 
-    def recent_raw_payloads(self, building_id, limit) -> list:
-        return [r[0] for r in self.conn.execute(
-            "SELECT raw_payload FROM sensor_readings WHERE building_id = ?"
-            " ORDER BY received_at DESC, reading_id DESC LIMIT ?", (building_id, limit))]
+    def device_building(self, device_id):
+        row = self.conn.execute("SELECT building_id FROM devices WHERE device_id = ?",
+                                (device_id,)).fetchone()
+        return row[0] if row else None

@@ -1,10 +1,12 @@
 """Dashboard module. Depends only on ad023.core abstractions.
 
-P1/P2 resolved in C2 (port + single aggregation rule). P3 (no authorization,
-raw payload exposure) is still present and is fixed in C4."""
+C2 resolved P1/P2 (port + single aggregation rule).
+C4 resolved P3: every query is authorized per building and raw payloads are
+no longer returned (intentional behavior change)."""
 
 from datetime import datetime
 
+from ad023.core.auth import AccessDenied, AuditLog, AuthPolicy, Principal
 from ad023.core.ports import UNITS, EnergyQueryPort, Window, round_kwh
 
 LATE_AFTER_SECONDS = 300  # [ĐỀ XUẤT] from MQTT draft PR #10, not approved
@@ -16,12 +18,19 @@ def _seconds_between(earlier, later):
 
 
 class DashboardService:
-    def __init__(self, energy: EnergyQueryPort):
+    def __init__(self, energy: EnergyQueryPort, auth: AuthPolicy, audit: AuditLog):
         self.energy = energy
+        self.auth = auth
+        self.audit = audit
 
-    def get_building_overview(self, building_id, start, end):
-        window = Window(start, end)
-        total = self.energy.building_energy(building_id, window)
+    def _require(self, principal: Principal, building_id, action, target):
+        if building_id is None or not self.auth.can_view_building(principal, building_id):
+            self.audit.denied(principal, action, target)
+            raise AccessDenied(f"{action} not allowed")
+
+    def get_building_overview(self, principal: Principal, building_id, start, end):
+        self._require(principal, building_id, "building_overview", building_id)
+        total = self.energy.building_energy(building_id, Window(start, end))
         return {
             "building_id": building_id,
             "metric": "energy_kwh",
@@ -29,10 +38,11 @@ class DashboardService:
             "window": {"start": start, "end": end},
             "value": round_kwh(total.kwh),
             "reading_count": total.reading_count,
-            "raw_debug_records": self.energy.recent_raw_payloads(building_id, 5),
         }
 
-    def get_device_history(self, device_id, start, end):
+    def get_device_history(self, principal: Principal, device_id, start, end):
+        building_id = self.energy.device_building(device_id)
+        self._require(principal, building_id, "device_history", device_id)
         return [{
             "event_time": r.event_time,
             "received_at": r.received_at,

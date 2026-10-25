@@ -9,6 +9,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from ad023.app import build_app  # noqa: E402
+from ad023.core.auth import Principal  # noqa: E402
 
 DAY13 = ("2026-10-13T00:00:00Z", "2026-10-14T00:00:00Z")
 DAY14 = ("2026-10-14T00:00:00Z", "2026-10-15T00:00:00Z")
@@ -38,10 +39,16 @@ def seeded_app():
     return app
 
 
+# BEHAVIOR-CHANGE-C4: the service now requires a Principal. Characterization
+# tests act as a user scoped to every seeded building, so their expectations
+# are unchanged; access control itself is tested in test_security.py.
+ALL_BUILDINGS = Principal("tester-all", frozenset({"BLD-A", "BLD-B"}))
+
+
 # --- the only two call sites of the Dashboard service -----------------------
-def overview(app, building_id, window):
-    return app.dashboard.get_building_overview(building_id, *window)
+def overview(app, building_id, window, principal=ALL_BUILDINGS):
+    return app.dashboard.get_building_overview(principal, building_id, *window)
 
 
-def history(app, device_id, window):
-    return app.dashboard.get_device_history(device_id, *window)
+def history(app, device_id, window, principal=ALL_BUILDINGS):
+    return app.dashboard.get_device_history(principal, device_id, *window)

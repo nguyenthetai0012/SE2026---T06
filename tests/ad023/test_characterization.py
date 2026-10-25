@@ -8,6 +8,7 @@ import unittest
 from datetime import date
 
 from tests.ad023.helpers import DAY13, DAY14, history, ingest, overview, seeded_app
+from ad023.core.auth import AccessDenied, Principal
 from ad023.ingestion.store import InvalidReading
 
 
@@ -93,16 +94,19 @@ class IngestionBehavior(unittest.TestCase):
 
 
 class BaselineFlaws(unittest.TestCase):
-    """BEHAVIOR-CHANGE-C4: these document flaws P3 of the baseline."""
+    """BEHAVIOR-CHANGE-C4: P3 fixed. Baseline asserted the flaws (see 4662872);
+    these now assert the corrected behavior. Full coverage in test_security.py."""
 
     def setUp(self):
         self.app = seeded_app()
 
-    def test_overview_leaks_raw_payloads(self):  # BEHAVIOR-CHANGE-C4
-        self.assertIn("raw_debug_records", overview(self.app, "BLD-A", DAY13))
+    def test_overview_no_longer_leaks_raw_payloads(self):  # BEHAVIOR-CHANGE-C4
+        self.assertNotIn("raw_debug_records", overview(self.app, "BLD-A", DAY13))
 
-    def test_any_caller_can_read_any_building(self):  # BEHAVIOR-CHANGE-C4
-        self.assertEqual(overview(self.app, "BLD-B", DAY13)["value"], 3.0)
+    def test_caller_cannot_read_unscoped_building(self):  # BEHAVIOR-CHANGE-C4
+        only_a = Principal("u-a", frozenset({"BLD-A"}))
+        with self.assertRaises(AccessDenied):
+            overview(self.app, "BLD-B", DAY13, principal=only_a)
 
 
 if __name__ == "__main__":
