@@ -225,6 +225,27 @@ Mỗi quyết định được đánh dấu một trong ba trạng thái:
 
 Những dòng trên **không** được implement như đã chốt cho đến khi chuyển sang **[ĐÃ XÁC NHẬN]** trên PR.
 
+### 3.1 Đề xuất trả lời của Backend (Tài) — **[ĐỀ XUẤT]**, chưa duyệt
+
+Đây là đề xuất để nhóm xác nhận hoặc bác bỏ trên PR. Không dòng nào dưới đây là quyết định; người ở cột cuối phải xác nhận trước khi chuyển sang **[ĐÃ XÁC NHẬN]**. Các con số ngưỡng/chu kỳ không được tự đặt ở đây: chỉ dẫn lại giá trị đã có trong bản nháp của người phụ trách.
+
+| ID | Đề xuất của Backend | Trạng thái | Người xác nhận |
+| --- | --- | --- | --- |
+| Q1 | Tổng quan lấy từ metric `energy_kwh`. **Trước hết cần làm rõ `energy_kwh` là số đọc tích lũy của đồng hồ hay điện năng trong từng khoảng đo.** Nếu tích lũy: lượng trong khoảng truy vấn = giá trị cuối khoảng trừ giá trị đầu khoảng; nếu theo khoảng: cộng các giá trị trong khoảng. Công thức chỉ chốt sau khi An trả lời. | [CÒN MỞ] | An, Sương |
+| Q2 | Khoảng mặc định 24 giờ gần nhất; biên nửa mở `[start, end)` để một bản ghi không bị tính vào hai khoảng liền kề. | [ĐỀ XUẤT] | Sương |
+| Q3 | API dùng timestamp UTC ISO-8601; Dashboard hiển thị theo giờ Việt Nam. | [ĐỀ XUẤT] | Cả nhóm |
+| Q4 | API dùng đúng `building_id` và `device_id` như bản nháp MQTT (`docs/contracts/mqtt-schema-v1.md`); cảm biến được xác định bởi cặp `device_id` + `metric`. Quy tắc đặt tên và phân biệt hoa/thường do An chốt ở contract MQTT. | [ĐỀ XUẤT] | An |
+| Q5 | Chu kỳ gửi lấy từ cấu hình Simulator của An (không đặt số ở đây). Thiết bị được coi là offline khi không có reading hợp lệ trong 3 chu kỳ (đề xuất phía Dashboard, comment Issue #2 ngày 14/10); số chu kỳ là tham số cấu hình. | [ĐỀ XUẤT] | An |
+| Q6 | `last_seen` = `received_at` lớn nhất của reading **hợp lệ**. Không dùng `event_time` vì dữ liệu đến trễ hoặc sai thứ tự sẽ làm lệch trạng thái online/offline. | [ĐỀ XUẤT] | An |
+| Q7 | Giữ như bản nháp MQTT: `event_time` do cảm biến gửi; `received_at` do Backend ghi khi nhận, không nằm trong payload. | [ĐỀ XUẤT] | An |
+| Q8 | Dùng làm giá trị khởi đầu các ngưỡng đã nêu trong `docs/requirements/simulator-requirements.md` (PR #10, đang đánh dấu đề xuất); ngưỡng là tham số cấu hình, chưa chốt trong contract này. | [CÒN MỞ] | An, Sương |
+| Q9 | Dashboard MVP chỉ cần hai metric `power_kw` và `energy_kwh` theo ánh xạ đơn vị đề xuất trong bản nháp MQTT. | [ĐỀ XUẤT] | An, Sương |
+| Q10 | MVP dùng một quy tắc đơn giản, kiểm thử được: reading vượt ngưỡng cố định theo từng metric sinh cảnh báo. Giá trị ngưỡng là cấu hình và chưa được chọn ở đây; không dùng thuật toán thống kê trong MVP. | [ĐỀ XUẤT] | Ngọc, nhóm |
+| Q11 | Cảnh báo MVP lọc theo `building_id` và `device_id`; chưa cần lọc theo thời gian. | [ĐỀ XUẤT] | Sương |
+| Q12 | Chưa đưa severity và trạng thái cảnh báo vào MVP (giữ mặc định). | [ĐỀ XUẤT] | Cả nhóm |
+| Q13 | Nếu nhóm chọn HTTP JSON: có dữ liệu = phản hồi thành công kèm danh sách; rỗng = phản hồi thành công kèm danh sách trống; lỗi = phản hồi lỗi kèm thông báo. Mã trạng thái cụ thể thuộc Issue #21. | [ĐỀ XUẤT] | Sương, Ngọc |
+| Q14 | Truy vấn lịch sử bắt buộc có `start` và `end`; có thể thêm giới hạn số bản ghi có trần. Phân trang đầy đủ hoãn lại nếu chưa cần. | [ĐỀ XUẤT] | Sương, Ngọc |
+
 ---
 
 ## 4. Checklist rà soát
@@ -265,7 +286,7 @@ Contract chỉ đóng issue #2 khi các mục dưới đây được xác nhận
 - [x] Ghi luồng hệ thống vào `docs/architecture/system-overview.md` (bổ sung Issue #2).
 - [x] Không chốt endpoint, tên trường, broker, ngôn ngữ, DB.
 - [x] Mỗi chức năng có mô tả hành vi và AC đối chiếu Dashboard.
-- [ ] Comment trên issue #2 khi có PR, nêu rõ phần **[ĐỀ XUẤT]** / **[CÒN MỞ]** (làm khi đẩy commit kiến trúc).
+- [x] Comment trên issue #2 khi có PR, nêu rõ phần **[ĐỀ XUẤT]** / **[CÒN MỞ]** (đã đăng ngày 25/10; mục 3.1 bổ sung đề xuất trả lời Q1–Q14).
 
 ---
 
