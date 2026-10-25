@@ -1,0 +1,58 @@
+{
+  "label": "C7 after fromisoformat",
+  "api": "C4 (principal)",
+  "dataset": {
+    "buildings": 10,
+    "devices": 100,
+    "days": 30,
+    "step_minutes": 15,
+    "readings": 288000
+  },
+  "calls_per_operation": 500,
+  "repeats": 3,
+  "seed_seconds": 9.43,
+  "environment": {
+    "python": "3.13.17",
+    "machine": "x86_64",
+    "sqlite": "3.53.1",
+    "store": "SQLite :memory:"
+  },
+  "runs": [
+    {
+      "overview_24h": {
+        "p50_ms": 0.407,
+        "p95_ms": 0.67,
+        "max_ms": 4.593
+      },
+      "device_history_24h": {
+        "p50_ms": 0.208,
+        "p95_ms": 0.404,
+        "max_ms": 1.067
+      }
+    },
+    {
+      "overview_24h": {
+        "p50_ms": 0.584,
+        "p95_ms": 0.697,
+        "max_ms": 0.856
+      },
+      "device_history_24h": {
+        "p50_ms": 0.201,
+        "p95_ms": 0.449,
+        "max_ms": 5.441
+      }
+    },
+    {
+      "overview_24h": {
+        "p50_ms": 0.618,
+        "p95_ms": 0.716,
+        "max_ms": 0.876
+      },
+      "device_history_24h": {
+        "p50_ms": 0.197,
+        "p95_ms": 0.239,
+        "max_ms": 0.338
+      }
+    }
+  ]
+}
