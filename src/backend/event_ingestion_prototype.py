@@ -24,6 +24,10 @@ class EventValidationError(ValueError):
     """The event does not satisfy the prototype's illustrative payload rules."""
 
 
+class IdempotencyConflict(RuntimeError):
+    """An existing event ID was reused with different event content."""
+
+
 class EventStoreUnavailable(RuntimeError):
     """The local store could not durably accept an event after bounded retries."""
 
@@ -165,6 +169,26 @@ class SQLiteEventRepository:
                 ),
             )
             inserted = cursor.rowcount == 1
+            if not inserted:
+                stored = connection.execute(
+                    """
+                    SELECT device_id, building_id, measured_at, metric, value, unit
+                    FROM readings WHERE event_id = ?
+                    """,
+                    (event.event_id,),
+                ).fetchone()
+                incoming = (
+                    event.device_id,
+                    event.building_id,
+                    event.measured_at,
+                    event.metric,
+                    event.value,
+                    event.unit,
+                )
+                if stored != incoming:
+                    raise IdempotencyConflict(
+                        f"event ID {event.event_id} was reused with different content"
+                    )
         return inserted
 
     def purge_before(self, cutoff_utc: str) -> int:
