@@ -13,10 +13,11 @@ from __future__ import annotations
 import math
 import sqlite3
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Iterator, Mapping
 
 
 class EventValidationError(ValueError):
@@ -44,6 +45,14 @@ class IngestResult:
     status: str  # "accepted" or "duplicate"
 
 
+def _format_utc(value: datetime) -> str:
+    return (
+        value.astimezone(timezone.utc)
+        .isoformat(timespec="microseconds")
+        .replace("+00:00", "Z")
+    )
+
+
 def _required_text(event: Mapping[str, Any], key: str) -> str:
     value = event.get(key)
     if not isinstance(value, str) or not value.strip():
@@ -60,7 +69,7 @@ def _utc_timestamp(value: str) -> str:
     if parsed.tzinfo is None:
         raise EventValidationError("measured_at must include a UTC offset")
 
-    return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    return _format_utc(parsed)
 
 
 def validate_event(payload: Mapping[str, Any]) -> ValidatedEvent:
@@ -99,8 +108,20 @@ class SQLiteEventRepository:
     def __init__(self, database_path: str | Path) -> None:
         self.database_path = str(database_path)
 
+    @contextmanager
+    def _transaction(self) -> Iterator[sqlite3.Connection]:
+        connection = sqlite3.connect(self.database_path, timeout=0.1)
+        try:
+            yield connection
+            connection.commit()
+        except BaseException:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
     def initialize(self) -> None:
-        with sqlite3.connect(self.database_path, timeout=0.1) as connection:
+        with self._transaction() as connection:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS readings (
@@ -123,7 +144,7 @@ class SQLiteEventRepository:
     def save_once(self, event: ValidatedEvent, received_at: str) -> bool:
         """Return True for a new row, False when this event ID already exists."""
         self.initialize()
-        with sqlite3.connect(self.database_path, timeout=0.1) as connection:
+        with self._transaction() as connection:
             cursor = connection.execute(
                 """
                 INSERT INTO readings(
@@ -143,16 +164,18 @@ class SQLiteEventRepository:
                     received_at,
                 ),
             )
-            return cursor.rowcount == 1
+            inserted = cursor.rowcount == 1
+        return inserted
 
     def purge_before(self, cutoff_utc: str) -> int:
         """Delete readings older than the supplied UTC cutoff."""
-        with sqlite3.connect(self.database_path, timeout=0.1) as connection:
+        with self._transaction() as connection:
             cursor = connection.execute(
                 "DELETE FROM readings WHERE measured_at < ?",
                 (cutoff_utc,),
             )
-            return cursor.rowcount
+            deleted = cursor.rowcount
+        return deleted
 
 
 class EventIngestionService:
@@ -185,8 +208,8 @@ class EventIngestionService:
         received_at: datetime | None = None,
     ) -> IngestResult:
         event = validate_event(payload)
-        received = (received_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
-        received_text = received.isoformat().replace("+00:00", "Z")
+        received = received_at or datetime.now(timezone.utc)
+        received_text = _format_utc(received)
 
         for attempt in range(self.max_attempts):
             try:
@@ -214,10 +237,9 @@ class EventIngestionService:
         raise AssertionError("unreachable retry state")
 
     def purge_expired(self, *, now: datetime | None = None) -> int:
-        current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-        cutoff = current - timedelta(days=self.retention_days)
-        cutoff_text = cutoff.isoformat().replace("+00:00", "Z")
-        return self.repository.purge_before(cutoff_text)
+        current = now or datetime.now(timezone.utc)
+        cutoff = current.astimezone(timezone.utc) - timedelta(days=self.retention_days)
+        return self.repository.purge_before(_format_utc(cutoff))
 
 
 def example_event() -> dict[str, Any]:
