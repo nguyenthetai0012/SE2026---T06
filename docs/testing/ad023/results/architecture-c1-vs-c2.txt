@@ -1,0 +1,13 @@
+Command: AD023_SRC=<checkout>/src/backend/ad023 python3 -m tests.ad023.test_architecture
+Python 3.13, run 2026-10-25.
+
+== Baseline C1 (4662872)
+R1 dashboard/service.py: imports sqlite3
+R3 dashboard/service.py: references sensor_readings
+R1 reporting/daily_rollup.py: imports sqlite3
+R3 reporting/daily_rollup.py: references sensor_readings
+exit=1
+
+== After refactor C2 (9444acd)
+no violations
+exit=0
