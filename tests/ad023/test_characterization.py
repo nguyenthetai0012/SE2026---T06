@@ -51,6 +51,18 @@ class HistoryBehavior(unittest.TestCase):
         late = {r["event_time"]: r["late"] for r in history(self.app, "METER-01", DAY13)}
         self.assertEqual(late, {"2026-10-13T08:00:00Z": False, "2026-10-13T08:15:00Z": True})
 
+    def test_late_flag_boundary_is_strictly_more_than_300_seconds(self):
+        ingest(self.app, "b-1", "BLD-A", "METER-02", "energy_kwh", 0.1,
+               "2026-10-13T09:00:00Z", received_at="2026-10-13T09:05:00Z")   # exactly 300 s
+        ingest(self.app, "b-2", "BLD-A", "METER-02", "energy_kwh", 0.1,
+               "2026-10-13T10:00:00Z", received_at="2026-10-13T10:05:01Z")   # 301 s
+        ingest(self.app, "b-3", "BLD-A", "METER-02", "energy_kwh", 0.1,
+               "2026-10-13T23:58:00Z", received_at="2026-10-14T00:04:00Z")   # crosses midnight
+        late = {r["event_time"]: r["late"] for r in history(self.app, "METER-02", DAY13)
+                if r["event_time"] >= "2026-10-13T09:00:00Z"}
+        self.assertEqual(late, {"2026-10-13T09:00:00Z": False, "2026-10-13T10:00:00Z": True,
+                                "2026-10-13T23:58:00Z": True})
+
     def test_each_reading_carries_its_unit(self):
         units = {r["metric"]: r["unit"] for r in history(self.app, "METER-02", DAY13)}
         self.assertEqual(units, {"energy_kwh": "kWh", "power_kw": "kW"})
