@@ -38,3 +38,7 @@ class SqliteEnergyQuery:
         row = self.conn.execute("SELECT building_id FROM devices WHERE device_id = ?",
                                 (device_id,)).fetchone()
         return row[0] if row else None
+
+    def building_ids(self):
+        return [r[0] for r in self.conn.execute(
+            "SELECT DISTINCT building_id FROM devices ORDER BY building_id")]

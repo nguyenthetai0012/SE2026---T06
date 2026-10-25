@@ -5,8 +5,11 @@ Rules
   R1  dashboard/, reporting/, core/ do not import sqlite3 (no storage in domain).
   R2  dashboard/, reporting/, core/ do not import ad023.ingestion (direction:
       domain -> core <- ingestion; only app.py wires implementations).
-  R3  Only ingestion/ mentions the sensor_readings table (data ownership).
+  R3  Data ownership: only the owning package mentions a table
+      (sensor_readings -> ingestion/; daily_rollups, rollup_quarantine ->
+      infrastructure/rollup_store.py, the Reporting-owned adapter).
   R4  core/ does not import dashboard/ or reporting/ (core stays innermost).
+  R5  dashboard/, reporting/, core/ do not import ad023.infrastructure.
 
 Set AD023_SRC=<path to src/backend/ad023> to check another checkout, e.g. the
 baseline commit, and print its violations:
@@ -21,6 +24,8 @@ from pathlib import Path
 
 DEFAULT_SRC = Path(__file__).resolve().parents[2] / "src" / "backend" / "ad023"
 DOMAIN = ("dashboard", "reporting", "core")
+TABLE_OWNER = {"sensor_readings": "ingestion/", "daily_rollups": "infrastructure/rollup_store.py",
+               "rollup_quarantine": "infrastructure/rollup_store.py"}
 
 
 def _src():
@@ -48,8 +53,11 @@ def violations(src=None):
                 found.append(f"R1 {rel}: imports sqlite3")
             if any(m == "ad023.ingestion" or m.startswith("ad023.ingestion.") for m in imports):
                 found.append(f"R2 {rel}: imports ad023.ingestion")
-        if package != "ingestion" and "sensor_readings" in text:
-            found.append(f"R3 {rel}: references sensor_readings")
+        for table, owner in TABLE_OWNER.items():
+            if table in text and not rel.as_posix().startswith(owner):
+                found.append(f"R3 {rel}: references {table}")
+        if package in DOMAIN and any(m.startswith("ad023.infrastructure") for m in imports):
+            found.append(f"R5 {rel}: imports ad023.infrastructure")
         if package == "core" and any(m.startswith(("ad023.dashboard", "ad023.reporting"))
                                      for m in imports):
             found.append(f"R4 {rel}: core depends on an outer module")
@@ -62,6 +70,21 @@ class ArchitectureRules(unittest.TestCase):
 
     def test_dependency_and_ownership_rules(self):
         self.assertEqual(violations(), [])
+
+    def test_rules_detect_planted_violations(self):
+        """Guard against a fitness test that can never fail."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for pkg in ("dashboard", "core", "ingestion"):
+                (root / pkg).mkdir()
+            (root / "dashboard" / "bad.py").write_text(
+                "import sqlite3\nfrom ad023.ingestion.store import X\n"
+                "from ad023.infrastructure.rollup_store import Y\nQ = 'SELECT * FROM daily_rollups'\n")
+            (root / "core" / "bad.py").write_text("from ad023.dashboard.service import Z\n")
+            (root / "ingestion" / "ok.py").write_text("Q = 'SELECT * FROM sensor_readings'\n")
+            rules = sorted(v.split()[0] for v in violations(root))
+        self.assertEqual(rules, ["R1", "R2", "R3", "R4", "R5"])
 
 
 if __name__ == "__main__":

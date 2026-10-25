@@ -40,3 +40,28 @@ class EnergyQueryPort(Protocol):
     def device_readings(self, device_id: str, window: Window) -> list[ReadingView]: ...
 
     def device_building(self, device_id: str) -> str | None: ...
+
+    def building_ids(self) -> list[str]: ...
+
+
+@dataclass(frozen=True)
+class PublishedRollup:
+    building_id: str
+    day: str
+    run_id: str
+    total_kwh: float
+    reading_count: int
+
+
+class RollupStorePort(Protocol):
+    """Owned by Reporting. Each call is one partition (building_id, day) and
+    commits on its own, so a failed partition cannot roll back the others."""
+
+    def publish(self, building_id: str, day: str, run_id: str,
+                total_kwh: float, reading_count: int) -> None: ...
+
+    def quarantine(self, building_id: str, day: str, run_id: str, error: str) -> None: ...
+
+    def published(self, day: str) -> dict[str, PublishedRollup]: ...
+
+    def quarantined(self, day: str) -> dict[str, str]: ...

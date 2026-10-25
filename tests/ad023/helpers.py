@@ -1,6 +1,7 @@
 """Shared fixture for AD-023 tests. Every call to the service goes through
 `overview()` / `history()` so that a later signature change touches one place."""
 
+import atexit
 import sys
 from pathlib import Path
 
@@ -15,6 +16,10 @@ DAY13 = ("2026-10-13T00:00:00Z", "2026-10-14T00:00:00Z")
 DAY14 = ("2026-10-14T00:00:00Z", "2026-10-15T00:00:00Z")
 
 
+_OPEN = []
+atexit.register(lambda: [c.close() for c in _OPEN])
+
+
 def ingest(app, message_id, building, device, metric, value, event_time, received_at=None):
     app.ingestion.clock = lambda: received_at or event_time
     return app.ingestion.ingest({
@@ -25,6 +30,7 @@ def ingest(app, message_id, building, device, metric, value, event_time, receive
 
 def seeded_app():
     app = build_app()
+    _OPEN.append(app.conn)  # closed at exit, avoids ResourceWarning noise
     for device, building in (("METER-01", "BLD-A"), ("METER-02", "BLD-A"), ("METER-03", "BLD-B")):
         app.ingestion.register_device(device, building)
     # Out of order on purpose: 08:15 arrives (late) before 08:00.
