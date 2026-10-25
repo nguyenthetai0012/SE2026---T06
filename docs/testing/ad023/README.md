@@ -71,12 +71,15 @@ Diễn giải:
 | Cấu hình | Code | p95 | Đạt ≤ 1,5 s? | File |
 | --- | --- | --- | --- | --- |
 | Burst, không giới hạn kết nối | C7 | 2,40–2,50 s | Không | `load-burst-unbounded.json` |
+| Burst, không giới hạn, **không có batch** | C7 | 2,45–2,60 s | Không | `load-burst-unbounded-nobatch.json` |
 | Burst, pool 4 kết nối | C6 | 1,36–1,42 s | Sát ngưỡng | `load-burst-pool4-c6.json` |
 | Burst, pool 4 kết nối | C7 | 0,68–0,74 s | Có | `load-burst-pool4.json` |
 | Ổn định, think time TB 1 s, không giới hạn | C7 | 1,1–1,5 ms | Có | `load-steady-unbounded.json` |
 | Ổn định, think time TB 1 s, pool 4 | C7 | 1,1–2,0 ms | Có | `load-steady-pool4.json` |
 
 Ở **mọi** lần chạy: 302/302 lần truy cập trái phép bị từ chối, 0 lần lộ dữ liệu, 0 lỗi khác; batch phát hiện 30/300 phân vùng sai, khôi phục 30, còn 0 sai sau khôi phục (chỉ tính lại 10% số phân vùng).
+
+Tắt batch không làm p95 burst tốt hơn → batch không phải nguyên nhân; nguyên nhân là 302 kết nối tranh chấp 2 vCPU (và trước C7, `strptime` tốn 1,39 ms/response lịch sử).
 
 Kết luận: mục tiêu p95 ≤ 1,5 s chỉ đạt khi **giới hạn số truy vấn đồng thời** (pool) hoặc tải có think time; burst không giới hạn trên 2 vCPU vượt mục tiêu. Đây là evidence trigger trong ADR của bài.
 

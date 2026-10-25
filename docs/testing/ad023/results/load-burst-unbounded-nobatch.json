@@ -1,0 +1,80 @@
+{
+  "scenario": "302 concurrent tasks, 1 building scope each, 1 cross-building attempt each, batch with one faulty building running concurrently then recovered",
+  "args": {
+    "out": "docs/testing/ad023/results/load-burst-unbounded-nobatch.json",
+    "runs": 3,
+    "no_batch": true,
+    "pool": 0,
+    "think_ms": 0
+  },
+  "target": {
+    "concurrent_tasks": 302,
+    "p95_ms_max": 1500
+  },
+  "dataset": {
+    "readings": 288000,
+    "buildings": 10,
+    "devices": 100,
+    "days": 30
+  },
+  "environment": {
+    "python": "3.13.17",
+    "sqlite": "3.53.1",
+    "cpus": 2,
+    "store": "SQLite file, WAL, one connection per task",
+    "scope": "in-process service calls; no HTTP, MQTT or PostgreSQL"
+  },
+  "runs": [
+    {
+      "requests": 3020,
+      "p50_ms": 103.64,
+      "p95_ms": 2445.96,
+      "p99_ms": 2825.71,
+      "max_ms": 3291.84,
+      "meets_p95_target": false,
+      "unauthorized_attempts": 302,
+      "denied": 302,
+      "leaked": 0,
+      "errors": 0,
+      "wall_s": 8.73,
+      "batch": null,
+      "with_batch": false,
+      "pool_size": "unbounded (one per task)",
+      "think_ms_mean": 0
+    },
+    {
+      "requests": 3020,
+      "p50_ms": 84.06,
+      "p95_ms": 2603.65,
+      "p99_ms": 2943.18,
+      "max_ms": 3572.51,
+      "meets_p95_target": false,
+      "unauthorized_attempts": 302,
+      "denied": 302,
+      "leaked": 0,
+      "errors": 0,
+      "wall_s": 9.16,
+      "batch": null,
+      "with_batch": false,
+      "pool_size": "unbounded (one per task)",
+      "think_ms_mean": 0
+    },
+    {
+      "requests": 3020,
+      "p50_ms": 74.56,
+      "p95_ms": 2460.68,
+      "p99_ms": 2877.66,
+      "max_ms": 3686.64,
+      "meets_p95_target": false,
+      "unauthorized_attempts": 302,
+      "denied": 302,
+      "leaked": 0,
+      "errors": 0,
+      "wall_s": 8.59,
+      "batch": null,
+      "with_batch": false,
+      "pool_size": "unbounded (one per task)",
+      "think_ms_mean": 0
+    }
+  ]
+}
