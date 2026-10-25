@@ -1,0 +1,58 @@
+{
+  "label": "C1 4662872",
+  "api": "C1 (no principal)",
+  "dataset": {
+    "buildings": 10,
+    "devices": 100,
+    "days": 30,
+    "step_minutes": 15,
+    "readings": 288000
+  },
+  "calls_per_operation": 500,
+  "repeats": 3,
+  "seed_seconds": 6.06,
+  "environment": {
+    "python": "3.13.17",
+    "machine": "x86_64",
+    "sqlite": "3.53.1",
+    "store": "SQLite :memory:"
+  },
+  "runs": [
+    {
+      "overview_24h": {
+        "p50_ms": 14.831,
+        "p95_ms": 23.866,
+        "max_ms": 27.959
+      },
+      "device_history_24h": {
+        "p50_ms": 0.921,
+        "p95_ms": 1.068,
+        "max_ms": 2.06
+      }
+    },
+    {
+      "overview_24h": {
+        "p50_ms": 14.674,
+        "p95_ms": 19.199,
+        "max_ms": 29.556
+      },
+      "device_history_24h": {
+        "p50_ms": 0.939,
+        "p95_ms": 1.279,
+        "max_ms": 2.312
+      }
+    },
+    {
+      "overview_24h": {
+        "p50_ms": 14.772,
+        "p95_ms": 23.317,
+        "max_ms": 31.568
+      },
+      "device_history_24h": {
+        "p50_ms": 0.939,
+        "p95_ms": 1.349,
+        "max_ms": 2.059
+      }
+    }
+  ]
+}

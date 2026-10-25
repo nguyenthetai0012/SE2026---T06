@@ -1,0 +1,58 @@
+{
+  "label": "C4 0f46e2a",
+  "api": "C4 (principal)",
+  "dataset": {
+    "buildings": 10,
+    "devices": 100,
+    "days": 30,
+    "step_minutes": 15,
+    "readings": 288000
+  },
+  "calls_per_operation": 500,
+  "repeats": 3,
+  "seed_seconds": 5.79,
+  "environment": {
+    "python": "3.13.17",
+    "machine": "x86_64",
+    "sqlite": "3.53.1",
+    "store": "SQLite :memory:"
+  },
+  "runs": [
+    {
+      "overview_24h": {
+        "p50_ms": 0.359,
+        "p95_ms": 0.555,
+        "max_ms": 0.812
+      },
+      "device_history_24h": {
+        "p50_ms": 0.975,
+        "p95_ms": 1.306,
+        "max_ms": 1.51
+      }
+    },
+    {
+      "overview_24h": {
+        "p50_ms": 0.294,
+        "p95_ms": 0.419,
+        "max_ms": 0.647
+      },
+      "device_history_24h": {
+        "p50_ms": 1.014,
+        "p95_ms": 1.163,
+        "max_ms": 1.25
+      }
+    },
+    {
+      "overview_24h": {
+        "p50_ms": 0.414,
+        "p95_ms": 0.486,
+        "max_ms": 0.533
+      },
+      "device_history_24h": {
+        "p50_ms": 0.76,
+        "p95_ms": 1.15,
+        "max_ms": 1.24
+      }
+    }
+  ]
+}
