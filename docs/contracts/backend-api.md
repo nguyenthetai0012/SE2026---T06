@@ -2,6 +2,7 @@
 
 - Issue nguồn: [#2 — Chốt yêu cầu Backend/API và luồng dữ liệu](https://github.com/nguyenthetai0012/SE2026---T06/issues/2)
 - Đối chiếu yêu cầu giao diện: [`docs/requirements/dashboard.md`](../requirements/dashboard.md)
+- Luồng hệ thống: [`docs/architecture/system-overview.md`](../architecture/system-overview.md)
 - Phụ trách soạn: Tài (Backend/API)
 - Phối hợp rà soát: Sương (Dashboard), An (MQTT/timestamp), Ngọc (fixture/test)
 - Trạng thái: **bản nháp để nhóm rà soát**; chưa được coi là contract đã duyệt cho đến khi xác nhận qua Pull Request.
@@ -185,13 +186,13 @@ Mỗi quyết định được đánh dấu một trong ba trạng thái:
 | --- | --- | --- | --- |
 | Thành công, có dữ liệu | Trả về một hoặc nhiều mục hợp lệ | Hiển thị dữ liệu; kết thúc trạng thái đang tải | **[ĐÃ XÁC NHẬN]** |
 | Thành công, danh sách rỗng | Truy vấn hợp lệ, không có bản ghi thỏa điều kiện | Hiển thị **không có dữ liệu** + phạm vi truy vấn; **không** báo lỗi tải | **[ĐÃ XÁC NHẬN]** (AC-08) |
-| Lỗi | Backend/kênh truyền không hoàn thành truy vấn | Hiển thị **lỗi**; cho phép **thử lại cùng điều kiện** | **[ĐÃ XÁC NHẬN]** (AC-09) |
+| Lỗi | Backend/kênh truyền không hoàn thành truy vấn | Hiển thị **lỗi**; cho phép **thử lại cùng điều kiện truy vấn** (không yêu cầu tập bản ghi giống hệt) | **[ĐÃ XÁC NHẬN]** (AC-09) |
 
 #### Hành vi
 
 1. Khi yêu cầu còn chờ phản hồi, Dashboard thể hiện đang tải; trạng thái này kết thúc khi có kết quả hoặc lỗi (AC-07). Đây chủ yếu là hành vi UI; Backend không được trả kết quả rỗng giả trong lúc chưa xử lý xong.
 2. Thành công rỗng **không** dùng cùng tín hiệu với lỗi.
-3. Khi lỗi, Frontend gửi lại **cùng** đối tượng, khoảng thời gian và bộ lọc hiện tại (AC-09). Backend phải xử lý idempotent ở mức truy vấn đọc: cùng điều kiện cho cùng ý nghĩa kết quả.
+3. Khi lỗi, Frontend gửi lại **cùng** đối tượng, khoảng thời gian và bộ lọc hiện tại (AC-09). Retry nghĩa là **cùng điều kiện truy vấn**, không cam kết hai lần trả **cùng tập bản ghi**: nếu Backend ingest thêm reading giữa hai lần gọi, kết quả có thể khác. Ý nghĩa điều kiện (đối tượng, khoảng, bộ lọc) không đổi.
 4. **[ĐÃ XÁC NHẬN]** Lỗi truy vấn không được Backend (hay Frontend) diễn giải thành thiết bị offline (AC-11).
 5. **[CÒN MỞ]** Mã lỗi, định dạng thông báo, timeout và phân trang — chưa chốt; chỉ cần bảo đảm ba lớp kết quả trên vẫn tách được.
 
@@ -199,7 +200,7 @@ Mỗi quyết định được đánh dấu một trong ba trạng thái:
 
 - **AC-07:** Trong thời gian chờ, UI đang tải; kết thúc khi có kết quả hoặc lỗi.
 - **AC-08:** Truy vấn thành công, danh sách rỗng → trạng thái không có dữ liệu, kèm phạm vi; không hiện lỗi tải.
-- **AC-09:** Truy vấn thất bại → trạng thái lỗi + thao tác thử lại; lần thử lại dùng cùng điều kiện.
+- **AC-09:** Truy vấn thất bại → trạng thái lỗi + thao tác thử lại; lần thử lại dùng cùng đối tượng, khoảng thời gian và bộ lọc. Không yêu cầu dữ liệu trả về giống hệt lần gọi trước.
 
 ---
 
@@ -238,7 +239,7 @@ Contract chỉ đóng issue #2 khi các mục dưới đây được xác nhận
 - [x] 2.2 đủ cho FLOW-02, AC-02, AC-05, AC-11: danh sách theo phạm vi, offline do Backend, không nhầm với lỗi tải.
 - [x] 2.3 đủ cho FLOW-03, FLOW-05, AC-03, AC-06, AC-10: lọc theo thời điểm đo, có thể hiện cũ/trễ khi nguồn cung cấp.
 - [x] 2.4 đủ cho FLOW-04, AC-04; đồng ý MVP **không** đóng/xác nhận cảnh báo.
-- [x] 2.5 đủ cho AC-07, AC-08, AC-09: có data / rỗng / lỗi + retry cùng điều kiện.
+- [x] 2.5 đủ cho AC-07, AC-08, AC-09: có data / rỗng / lỗi + retry cùng điều kiện truy vấn (kết quả có thể khác nếu có ingest mới).
 - [x] Không thiếu dữ liệu so với bảng màn hình trong `docs/requirements/dashboard.md`.
 
 ### 4.2 An (@NguyenThaiAn2810) — MQTT, timestamp, chu kỳ gửi
@@ -261,9 +262,10 @@ Contract chỉ đóng issue #2 khi các mục dưới đây được xác nhận
 ### 4.4 Tài — trước khi mở PR
 
 - [x] Ghi contract vào `docs/contracts/backend-api.md`.
-- [ ] Không chốt endpoint, tên trường, broker, ngôn ngữ, DB.
-- [ ] Mỗi chức năng có mô tả hành vi và AC đối chiếu Dashboard.
-- [ ] Comment trên issue #2 khi có PR, nêu rõ phần **[ĐỀ XUẤT]** / **[CÒN MỞ]**.
+- [x] Ghi luồng hệ thống vào `docs/architecture/system-overview.md` (bổ sung Issue #2).
+- [x] Không chốt endpoint, tên trường, broker, ngôn ngữ, DB.
+- [x] Mỗi chức năng có mô tả hành vi và AC đối chiếu Dashboard.
+- [ ] Comment trên issue #2 khi có PR, nêu rõ phần **[ĐỀ XUẤT]** / **[CÒN MỞ]** (làm khi đẩy commit kiến trúc).
 
 ---
 

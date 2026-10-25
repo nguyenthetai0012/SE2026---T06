@@ -21,6 +21,8 @@ Dự án đang ở giai đoạn khởi tạo. Chưa có ứng dụng chạy đư
 
 README này ghi nhận phạm vi theo nguồn được cung cấp. Các thiết kế chi tiết trong tài liệu vẫn cần nhóm xem xét và phê duyệt.
 
+Bản nháp đang rà soát (chưa duyệt): luồng hệ thống [`docs/architecture/system-overview.md`](docs/architecture/system-overview.md); hợp đồng đầu ra Backend [`docs/contracts/backend-api.md`](docs/contracts/backend-api.md) (Issue #2 / PR #13). Stack Backend/Simulator: Issue #20. API cụ thể: Issue #21.
+
 ## Quyết định cần chốt trước khi triển khai
 
 - Backend, frontend, cơ sở dữ liệu và MQTT broker.
