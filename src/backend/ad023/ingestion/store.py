@@ -6,7 +6,8 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-UNITS = {"power_kw": "kW", "energy_kwh": "kWh"}
+from ad023.core.ports import UNITS
+
 REQUIRED = ("schema_version", "message_id", "building_id", "device_id",
             "event_time", "metric", "value")
 SCHEMA = Path(__file__).with_name("schema.sql")

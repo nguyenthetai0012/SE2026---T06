@@ -1,57 +1,43 @@
-"""Dashboard module (BASELINE C1 — contains deliberate design problems).
+"""Dashboard module. Depends only on ad023.core abstractions.
 
-Problems kept on purpose for the AD-023 analysis:
-  P1  Dashboard reads the Ingestion-owned table with raw SQL (boundary / ownership).
-  P2  Energy aggregation SQL and the window rule are duplicated in DailyRollupJob.
-  P3  No authorization check and raw payloads are returned to the caller.
-"""
+P1/P2 resolved in C2 (port + single aggregation rule). P3 (no authorization,
+raw payload exposure) is still present and is fixed in C4."""
 
-import sqlite3
 from datetime import datetime
 
-UNITS = {"power_kw": "kW", "energy_kwh": "kWh"}  # duplicated from ingestion
+from ad023.core.ports import UNITS, EnergyQueryPort, Window, round_kwh
+
 LATE_AFTER_SECONDS = 300  # [ĐỀ XUẤT] from MQTT draft PR #10, not approved
+_FMT = "%Y-%m-%dT%H:%M:%SZ"
 
 
 def _seconds_between(earlier, later):
-    fmt = "%Y-%m-%dT%H:%M:%SZ"
-    return (datetime.strptime(later, fmt) - datetime.strptime(earlier, fmt)).total_seconds()
+    return (datetime.strptime(later, _FMT) - datetime.strptime(earlier, _FMT)).total_seconds()
 
 
 class DashboardService:
-    def __init__(self, conn: sqlite3.Connection):
-        self.conn = conn
+    def __init__(self, energy: EnergyQueryPort):
+        self.energy = energy
 
     def get_building_overview(self, building_id, start, end):
-        total, count = self.conn.execute(
-            "SELECT SUM(value), COUNT(*) FROM sensor_readings"
-            " WHERE building_id = ? AND metric = 'energy_kwh'"
-            " AND event_time >= ? AND event_time < ?",
-            (building_id, start, end)).fetchone()
-        debug = [r[0] for r in self.conn.execute(
-            "SELECT raw_payload FROM sensor_readings WHERE building_id = ?"
-            " ORDER BY received_at DESC, reading_id DESC LIMIT 5", (building_id,))]
+        window = Window(start, end)
+        total = self.energy.building_energy(building_id, window)
         return {
             "building_id": building_id,
             "metric": "energy_kwh",
             "unit": UNITS["energy_kwh"],
             "window": {"start": start, "end": end},
-            "value": round(total or 0.0, 3),
-            "reading_count": count,
-            "raw_debug_records": debug,
+            "value": round_kwh(total.kwh),
+            "reading_count": total.reading_count,
+            "raw_debug_records": self.energy.recent_raw_payloads(building_id, 5),
         }
 
     def get_device_history(self, device_id, start, end):
-        rows = self.conn.execute(
-            "SELECT event_time, received_at, metric, value FROM sensor_readings"
-            " WHERE device_id = ? AND event_time >= ? AND event_time < ?"
-            " ORDER BY event_time, reading_id",
-            (device_id, start, end)).fetchall()
         return [{
-            "event_time": event_time,
-            "received_at": received_at,
-            "metric": metric,
-            "value": value,
-            "unit": UNITS[metric],
-            "late": _seconds_between(event_time, received_at) > LATE_AFTER_SECONDS,
-        } for event_time, received_at, metric, value in rows]
+            "event_time": r.event_time,
+            "received_at": r.received_at,
+            "metric": r.metric,
+            "value": r.value,
+            "unit": UNITS[r.metric],
+            "late": _seconds_between(r.event_time, r.received_at) > LATE_AFTER_SECONDS,
+        } for r in self.energy.device_readings(device_id, Window(start, end))]
