@@ -1,0 +1,128 @@
+{
+  "python": "3.12.14",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "sqlite": "3.53.1",
+  "source_commit": "7ccec19b4f10a2e19c21e178706005f268762678",
+  "checks": [
+    {
+      "id": "T01-idempotency",
+      "status": "PASS",
+      "detail": "accepted -> new instance duplicate; conflicting payload rejected; 1 row",
+      "seconds": 0.0734
+    },
+    {
+      "id": "T02-validation",
+      "status": "PASS",
+      "detail": "4 invalid payloads rejected; 0 rows",
+      "seconds": 0.0261
+    },
+    {
+      "id": "T03-transaction",
+      "status": "PASS",
+      "detail": "failure after INSERT before commit rolled back; 0 rows",
+      "seconds": 0.0355
+    },
+    {
+      "id": "T04-lock-recovery",
+      "status": "PASS",
+      "detail": {
+        "recovered": true,
+        "elapsed_seconds": 0.2155,
+        "rows": 1
+      },
+      "seconds": 0.2482
+    },
+    {
+      "id": "T05-lock-exhaustion",
+      "status": "PASS",
+      "detail": {
+        "recovered": false,
+        "elapsed_seconds": 1.4113,
+        "rows": 0
+      },
+      "seconds": 1.4443
+    },
+    {
+      "id": "T06-retention-boundary",
+      "status": "PASS",
+      "detail": "older by 1 microsecond deleted; exact boundary and newer retained",
+      "seconds": 0.1026
+    },
+    {
+      "id": "T07-restore-replay-demo",
+      "status": "PASS",
+      "detail": {
+        "rows": [
+          [
+            "replay-0",
+            10.0
+          ],
+          [
+            "replay-1",
+            11.0
+          ],
+          [
+            "replay-2",
+            12.0
+          ]
+        ],
+        "replay_status": [
+          "duplicate",
+          "accepted",
+          "accepted"
+        ],
+        "restore_replay_seconds": 0.0708,
+        "scope": "harness-only snapshot + JSONL; not production feature"
+      },
+      "seconds": 0.173
+    },
+    {
+      "id": "T08-small-refactor-equivalence",
+      "status": "PASS",
+      "detail": {
+        "before": [
+          "accepted",
+          "duplicate",
+          "IdempotencyConflict",
+          1
+        ],
+        "after": [
+          "accepted",
+          "duplicate",
+          "IdempotencyConflict",
+          1
+        ],
+        "candidate": "local only; not pushed"
+      },
+      "seconds": 0.147
+    }
+  ],
+  "observations": [
+    {
+      "id": "F01-stale-replay",
+      "actual": "accepted",
+      "rows_after_replay": 1,
+      "impact": "expired event can be reinserted after purge; no age admission rule"
+    },
+    {
+      "id": "F02-error-taxonomy",
+      "actual_exception": "OperationalError",
+      "message": "no such table: readings",
+      "impact": "purge emits raw OperationalError instead of service-level typed error"
+    }
+  ],
+  "burst_291": {
+    "submitted": 291,
+    "threads": 291,
+    "accepted": 26,
+    "errors": 265,
+    "p95_all_terminal_seconds": 3.4999,
+    "p95_success_seconds": 3.5277,
+    "status_counts": {
+      "accepted": 26,
+      "EventStoreUnavailable": 265
+    },
+    "rows": 26,
+    "scope": "single local burst; no MQTT, HTTP, network, dashboard or sustained workload; terminal timing excludes barrier wait"
+  }
+}

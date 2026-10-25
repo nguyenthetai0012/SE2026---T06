@@ -1,0 +1,65 @@
+{
+  "id": "T09-shared-mapping-extraction",
+  "status": "PASS",
+  "source_commit": "7ccec19b4f10a2e19c21e178706005f268762678",
+  "scope": "local candidate only; INSERT and conflict comparison share one canonical mapping; not pushed",
+  "signatures": [
+    {
+      "version": "before",
+      "outcomes": [
+        "accepted",
+        "duplicate",
+        "device_id:IdempotencyConflict",
+        "building_id:IdempotencyConflict",
+        "measured_at:IdempotencyConflict",
+        "metric:IdempotencyConflict",
+        "value:IdempotencyConflict",
+        "unit:IdempotencyConflict",
+        "duplicate",
+        "EventValidationError",
+        "EventStoreUnavailable"
+      ],
+      "rows": [
+        [
+          "sample-evt-001",
+          "meter-01",
+          "building-a",
+          "2026-10-25T03:00:00.000000Z",
+          "energy",
+          12.5,
+          "kWh",
+          "2026-10-25T12:00:00.000000Z"
+        ]
+      ]
+    },
+    {
+      "version": "after",
+      "outcomes": [
+        "accepted",
+        "duplicate",
+        "device_id:IdempotencyConflict",
+        "building_id:IdempotencyConflict",
+        "measured_at:IdempotencyConflict",
+        "metric:IdempotencyConflict",
+        "value:IdempotencyConflict",
+        "unit:IdempotencyConflict",
+        "duplicate",
+        "EventValidationError",
+        "EventStoreUnavailable"
+      ],
+      "rows": [
+        [
+          "sample-evt-001",
+          "meter-01",
+          "building-a",
+          "2026-10-25T03:00:00.000000Z",
+          "energy",
+          12.5,
+          "kWh",
+          "2026-10-25T12:00:00.000000Z"
+        ]
+      ]
+    }
+  ],
+  "limits": "finite characterization cases, not a proof of equivalence for all inputs"
+}
