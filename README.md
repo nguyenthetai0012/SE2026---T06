@@ -17,7 +17,7 @@ Các hạng mục kiểm chứng được đề tài nêu: **simulator, schema c
 
 ## Trạng thái dự án
 
-Dự án đang ở giai đoạn khởi tạo. Chưa có ứng dụng chạy được, contract được duyệt, pipeline CI hoặc kết quả kiểm thử chức năng và hiệu năng.
+Dự án đang chuẩn bị triển khai. Chưa có ứng dụng chạy được hoặc kết quả kiểm thử chức năng/hiệu năng. Các workflow hỗ trợ AI review không thay thế CI kiểm chứng ứng dụng.
 
 README này ghi nhận phạm vi theo nguồn được cung cấp. Các thiết kế chi tiết trong tài liệu vẫn cần nhóm xem xét và phê duyệt.
 
@@ -85,3 +85,9 @@ Tài liệu do nhóm cung cấp:
 
 Các tài liệu nguồn được cung cấp ngoài repo; README tách yêu cầu đã xác nhận khỏi phân công, lịch và thiết kế còn cần nhóm duyệt.
 
+
+## Bộ tài liệu MVP tổng hợp — đề xuất duyệt chung
+
+Bắt đầu từ [baseline MVP](docs/decisions/mvp-baseline.md), có stack, kiến trúc, MQTT, API, Frontend/mock, test oracle và thứ tự triển khai. Bộ này giải quyết cụ thể các câu hỏi mở bên trên, **chưa tự nhận là đã được nhóm phê duyệt**. Tài điều phối review/merge; sau khi chấp nhận, dùng bộ này làm cơ sở code thay các draft cũ.
+
+[Dữ liệu nghiệm thu JSON](docs/testing/fixtures/mvp-normal.json) có 12 readings và kết quả kỳ vọng; đã kiểm tra phép tính fixture, chưa chạy qua Backend. [Hướng dẫn tích hợp](docs/tasks/mvp-implementation.md) ghi rõ các lệnh mục tiêu chưa được kiểm chứng trên ứng dụng.
