@@ -55,7 +55,7 @@ SE2026---T06/
 
 ## 3. Quy trình Làm việc Bắt buộc của AI Agent (Workflow)
 
-Mọi Agent khi thực hiện tác vụ liên quan đến Issue phải tuân thủ nghiêm ngặt 8 bước sau:
+Mọi Agent khi thực hiện tác vụ liên quan đến Issue phải tuân thủ nghiêm ngặt 6 bước sau:
 
 ### Bước 1: Tiếp nhận & Phân tích Ngữ cảnh
 * Đọc kỹ `AGENTS.md`, `README.md`, thông tin Issue được giao (`#ISSUE_NUMBER`) và các tài liệu liên quan trong thư mục `docs/`.
