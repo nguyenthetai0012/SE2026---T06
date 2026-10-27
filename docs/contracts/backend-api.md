@@ -238,7 +238,7 @@ Những dòng trên **không** được implement như đã chốt cho đến kh
 | Q5 | Chu kỳ gửi lấy từ cấu hình Simulator của An (không đặt số ở đây). Thiết bị được coi là offline khi không có reading hợp lệ trong 3 chu kỳ (đề xuất phía Dashboard, comment Issue #2 ngày 14/10); số chu kỳ là tham số cấu hình. | [ĐỀ XUẤT] | An |
 | Q6 | `last_seen` = `received_at` lớn nhất của reading **hợp lệ**. Không dùng `event_time` vì dữ liệu đến trễ hoặc sai thứ tự sẽ làm lệch trạng thái online/offline. | [ĐỀ XUẤT] | An |
 | Q7 | Giữ như bản nháp MQTT: `event_time` do cảm biến gửi; `received_at` do Backend ghi khi nhận, không nằm trong payload. | [ĐỀ XUẤT] | An |
-| Q8 | Dùng làm giá trị khởi đầu các ngưỡng đã nêu trong `docs/requirements/simulator-requirements.md` (PR #10, đang đánh dấu đề xuất); ngưỡng là tham số cấu hình, chưa chốt trong contract này. | [CÒN MỞ] | An, Sương |
+| Q8 | Chưa có ngưỡng dữ liệu cũ/đến trễ được đề xuất hoặc phê duyệt trong contract Simulator hiện tại. Ví dụ lùi một giờ ở PR #10 chỉ là fixture, không phải ngưỡng. An và Tài cần đề xuất riêng cách nhận biết late và freshness, kèm fixture để Ngọc kiểm chứng; Sương hiển thị trạng thái nguồn cung cấp, không tự tính ngưỡng. | [CÒN MỞ] | An, Tài, Sương; Ngọc review fixture |
 | Q9 | Dashboard MVP chỉ cần hai metric `power_kw` và `energy_kwh` theo ánh xạ đơn vị đề xuất trong bản nháp MQTT. | [ĐỀ XUẤT] | An, Sương |
 | Q10 | MVP dùng một quy tắc đơn giản, kiểm thử được: reading vượt ngưỡng cố định theo từng metric sinh cảnh báo. Giá trị ngưỡng là cấu hình và chưa được chọn ở đây; không dùng thuật toán thống kê trong MVP. | [ĐỀ XUẤT] | Ngọc, nhóm |
 | Q11 | Cảnh báo MVP lọc theo `building_id` và `device_id`; chưa cần lọc theo thời gian. | [ĐỀ XUẤT] | Sương |
