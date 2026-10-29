@@ -20,6 +20,10 @@ Ví dụ power:
 ```json
 {"schema_version":"1.0","message_id":"00000000-0000-4000-8000-000000000001","building_id":"BLD-A","device_id":"A-01","event_time":"2026-10-27T00:01:00Z","metric":"power_kw","value":12}
 ```
+Payload không hợp lệ (value gửi dạng chuỗi, phải là số hữu hạn không âm); worker reject với mã INVALID_VALUE, không ghi reading/alert và không cập nhật last_seen:
+```json
+{"schema_version":"1.0","message_id":"00000000-0000-4000-8000-000000000003","building_id":"BLD-A","device_id":"A-01","event_time":"2026-10-27T00:01:00Z","metric":"power_kw","value":"12"}
+```
 Ví dụ energy của phút vừa đo:
 ```json
 {"schema_version":"1.0","message_id":"00000000-0000-4000-8000-000000000002","building_id":"BLD-A","device_id":"A-01","interval_start":"2026-10-27T00:00:00Z","event_time":"2026-10-27T00:01:00Z","metric":"energy_kwh","value":0.2}
