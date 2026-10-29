@@ -33,7 +33,7 @@ Device thuộc một building cố định trong dataset MVP; không đổi mapp
 Unique (device_id,metric,event_time); interval energy không được chồng lấn trong cùng device.
 Dùng transaction + khóa row device để tuần tự hóa kiểm tra overlap/high-watermark. DB cũng bật extension btree_gist và ràng buộc EXCLUDE có điều kiện cho metric energy_kwh trên (device_id =, tstzrange(interval_start,event_time,'[)') &&); ràng buộc chặn overlap kể cả khi writer không đi qua worker. UNIQUE (device_id,metric,event_time) chặn cùng event_time.
 Index history (device_id,metric,event_time,message_id), alerts (detected_at,alert_id), devices(building_id).
-Không lưu JSON float NaN/Infinity, không dùng giờ local trong DB; giữ độ chính xác decimal ở DB, API trả JSON number.
+CHECK constraint cho metric/value/interval_start phải đồng bộ: metric chỉ power_kw/energy_kwh; value>=0; energy_kwh iff interval_start IS NOT NULL; power_kw iff interval_start IS NULL. Không lưu JSON float NaN/Infinity, không dùng giờ local trong DB; giữ độ chính xác decimal ở DB, API trả JSON number.
 
 last_seen=max(received_at accepted); latest_event_time=max(event_time accepted).
 is_out_of_order so với max event_time đã nhận của cùng device+metric trước transaction.
