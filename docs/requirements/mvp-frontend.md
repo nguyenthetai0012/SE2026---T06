@@ -1,6 +1,6 @@
 # Frontend MVP và mock độc lập
 
-Trạng thái: [baseline đề xuất](../decisions/mvp-baseline.md). Refs #4, #11, #12, #21.
+Trạng thái: [baseline đề xuất](../decisions/mvp-baseline.md). Refs #4, #11, #12, #21. Mock: [mvp-dashboard.mock.json](fixtures/mvp-dashboard.mock.json).
 Không thay FLOW01–05/AC01–12 trong [dashboard.md](dashboard.md).
 
 ## Màn hình và cách hoạt động
@@ -49,11 +49,22 @@ Chart thư viện cụ thể là lựa chọn scaffold, chưa ép thêm dependen
 
 ## Fixture cần triển khai
 
-Dùng các ví dụ/quy tắc trong [nghiệm thu](../testing/mvp-acceptance.md) làm oracle, clock cố định.
+Dùng [mvp-dashboard.mock.json](fixtures/mvp-dashboard.mock.json) làm mock UI theo đúng DTO API: summary partial, devices online/offline/unknown, history late/out-of-order, alert gắn đối tượng, loading/empty/error-retry. Fixture tách khỏi payload MQTT. Dùng các ví dụ/quy tắc trong [nghiệm thu](../testing/mvp-acceptance.md) làm oracle, clock cố định.
 Mỗi endpoint có success/empty/error/delayed; devices thêm offline/unknown; history thêm late/out-of-order; summary thêm partial/null/zero.
 Không dùng chuỗi “power_kw (provisional example)” làm enum như mock draft; wire metric phải power_kw.
 Kiểm tra mock DTO bằng typecheck; khi có Backend thêm contract tests so JSON thực với DTO.
 Không cần chờ broker để code UI sau khi baseline được duyệt.
+
+## Đối chiếu AC-01…AC-12
+
+- AC-01, AC-12: hai BuildingSummary khác nhau, đúng building ID và khoảng.
+- AC-02, AC-05, AC-11: Device thuộc đúng building, status offline riêng lỗi tải; unknown được thể hiện riêng.
+- AC-03, AC-06, AC-10: Reading giữ event_time, value/unit, late/out-of-order flags và lọc đúng device/range.
+- AC-04: Alert liên kết đúng building/device, không để UI tự tạo.
+- AC-07, AC-08, AC-09: query_scenarios loading, empty thành công, lỗi và retry cùng filters.
+- AC-12: các ID trong fixture nhất quán giữa summary, devices, history và alerts.
+
+Đây là dữ liệu mock nội bộ theo DTO được đề xuất, chưa phải phản hồi Backend thật. Sương có thể dựng UI với fixture này, sau khi baseline được duyệt; khi OpenAPI thực sinh, đối chiếu contract-test trước khi chuyển real mode.
 
 ## Hoàn thành Frontend scaffold nghĩa là gì?
 
