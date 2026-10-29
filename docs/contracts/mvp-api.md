@@ -48,7 +48,7 @@ Device:
 - last_seen:timestamp|null; latest_event_time:timestamp|null; data_stale:boolean.
 - period_seconds:positive integer.
 - disabled ưu tiên khi enabled=false; unknown khi last_seen=null; offline khi generated_at-last_seen >=3*period; còn lại online.
-- data_stale=true nếu latest_event_time=null hoặc generated_at-latest_event_time >3*period.
+- data_stale=true nếu latest_event_time=null hoặc generated_at-latest_event_time >=3*period. Cùng biên với status=offline.
 - Dùng cùng generated_at cho toàn page; UI không tự suy status từ thời gian máy khách.
 
 Reading:
