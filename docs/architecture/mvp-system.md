@@ -31,7 +31,7 @@ QoS1 không phải bảo đảm exactly-once đầu cuối. Simulator giữ mess
 
 Device thuộc một building cố định trong dataset MVP; không đổi mapping khi đã có readings.
 Unique (device_id,metric,event_time); interval energy không được chồng lấn trong cùng device.
-Dùng transaction + khóa device row cho kiểm tra overlap/high-watermark; unique constraint là lớp bảo vệ cuối cùng.
+Dùng transaction + khóa row device để tuần tự hóa kiểm tra overlap/high-watermark. DB cũng bật extension btree_gist và ràng buộc EXCLUDE có điều kiện cho metric energy_kwh trên (device_id =, tstzrange(interval_start,event_time,'[)') &&); ràng buộc chặn overlap kể cả khi writer không đi qua worker. UNIQUE (device_id,metric,event_time) chặn cùng event_time.
 Index history (device_id,metric,event_time,message_id), alerts (detected_at,alert_id), devices(building_id).
 Không lưu JSON float NaN/Infinity, không dùng giờ local trong DB; giữ độ chính xác decimal ở DB, API trả JSON number.
 
