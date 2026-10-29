@@ -72,6 +72,11 @@ GET /api/v1/devices?building_id=BLD-A:
 ```json
 {"data":[{"device_id":"A-01","building_id":"BLD-A","name":"Meter A1","enabled":true,"status":"online","last_seen":"2026-10-27T00:01:01Z","latest_event_time":"2026-10-27T00:01:00Z","data_stale":false,"period_seconds":60}],"meta":{"generated_at":"2026-10-27T00:01:02Z","building_id":"BLD-A","next_cursor":null}}
 ```
+Lỗi validation giữ một định dạng envelope nhất quán:
+```json
+{"error":{"code":"INVALID_QUERY","message":"start must be earlier than end","request_id":"req-mock-01"}}
+```
+
 Empty history giữ đúng query:
 ```json
 {"data":[],"meta":{"generated_at":"2026-10-27T00:01:02Z","device_id":"A-01","metric":"power_kw","start":"2026-10-26T00:00:00Z","end":"2026-10-26T00:01:00Z","next_cursor":null}}
