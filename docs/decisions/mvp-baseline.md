@@ -26,7 +26,7 @@ Bộ này tổng hợp và giải quyết các chỗ mở, không ghi đè lịc
 | --- | --- | --- |
 | Frontend | React + TypeScript + Vite; npm, Node 22 >=22.12 | Theo hướng PR17; một web UI dùng lại API khi có desktop |
 | Backend | Python 3.12, FastAPI, Pydantic 2, Uvicorn | Một ngôn ngữ với simulator; mô hình dữ liệu sinh OpenAPI |
-| Storage | PostgreSQL 16; SQLAlchemy 2, psycopg 3, Alembic | Theo PR23; timestamptz và index cho time-series MVP; chưa cần extension |
+| Storage | PostgreSQL 16; SQLAlchemy 2, psycopg 3, Alembic | Theo PR23; timestamptz và index cho time-series MVP. Bật extension btree_gist để hỗ trợ ràng buộc EXCLUDE chống chồng interval energy như mô tả trong kiến trúc |
 | MQTT | Mosquitto 2, MQTT 3.1.1, QoS 1, Paho MQTT Python 2 | Giao nhận có thể lặp, ứng dụng idempotent |
 | Simulator | Python 3.12 + Paho; seed tái lập | Không cần phần cứng |
 | Tests | pytest; Vitest + Testing Library; Playwright | Unit/contract/integration/UI; load qua simulator |
@@ -53,7 +53,7 @@ Các giá trị demo dưới đây là **đề xuất kỹ thuật mới**, khô
 | Q5 | Chu kỳ demo 60 giây; offline sau >=3 chu kỳ từ last_seen. Thiết bị chưa từng gửi là unknown, không gán online. |
 | Q6 | last_seen là received_at lớn nhất của reading hợp lệ mới được chấp nhận; replay/invalid không refresh. |
 | Q7 | event_time từ simulator; received_at chỉ Backend đặt tại lần nhận. |
-| Q8 | is_late nếu received_at-event_time >2 chu kỳ. data_stale nếu latest_event_time chưa có hoặc now-latest_event_time >3 chu kỳ. Late và out-of-order độc lập. |
+| Q8 | is_late nếu received_at-event_time >2 chu kỳ. data_stale nếu latest_event_time chưa có hoặc generated_at-latest_event_time >=3 chu kỳ; dùng cùng biên với offline. Late và out-of-order độc lập. |
 | Q9 | power_kw/kW và energy_kwh/kWh; value không âm, hữu hạn. |
 | Q10 | Chỉ cảnh báo power_kw > ngưỡng cấu hình riêng thiết bị. Demo 10 kW. Mỗi reading vượt ngưỡng tạo một alert, duplicate không tạo lại. Không dùng ngưỡng tích lũy kWh. |
 | Q11 | Alerts lọc building_id/device_id, có phân trang; chưa cần lọc thời gian. |
