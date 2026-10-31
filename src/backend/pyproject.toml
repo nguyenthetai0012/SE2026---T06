@@ -1,0 +1,11 @@
+[project]
+name = "app05-backend"
+version = "0.1.0"
+description = "APP-05 Smart Campus Energy Dashboard - Backend API (đọc dữ liệu) theo baseline MVP"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+# Chạy từ src/backend: pytest
+testpaths = ["../../tests/integration/backend"]
+pythonpath = ["."]
+addopts = "-ra"
