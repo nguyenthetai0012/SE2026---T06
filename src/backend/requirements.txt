@@ -1,0 +1,9 @@
+# Runtime. Các phiên bản này đã được cài và chạy test thật trên Python 3.12.3 và 3.13 (xem README.md).
+# Baseline đề xuất Python 3.12.
+fastapi==0.162.0
+starlette==1.10.0
+uvicorn==0.54.0
+pydantic==2.14.2
+SQLAlchemy==2.1.6
+psycopg[binary]==3.3.6
+alembic==1.20.1
