@@ -1,0 +1,92 @@
+import type { AlertDto, ApiEnvelope, BuildingSummaryDto, DeviceDto, ReadingDto } from '../api/dto'
+
+/** Synthetic UI-only fixtures aligned to the DTO proposal in PR #27. */
+export interface DashboardFixture {
+  clock: string
+  summary: ApiEnvelope<BuildingSummaryDto[]>
+  devices: ApiEnvelope<DeviceDto[]>
+  readings: ApiEnvelope<ReadingDto[]>
+  alerts: ApiEnvelope<AlertDto[]>
+}
+
+export const dashboardFixture = {
+  clock: '2026-10-27T00:03:00Z',
+  summary: {
+    data: [
+      {
+        building_id: 'BLD-A', name: 'Tòa nhà A', energy_kwh: 0.5, unit: 'kWh',
+        start: '2026-10-27T00:00:00Z', end: '2026-10-27T00:02:00Z',
+        included_interval_count: 3, coverage: 'partial', coverage_ratio: 0.75, data_stale: false,
+      },
+      {
+        building_id: 'BLD-B', name: 'Tòa nhà B', energy_kwh: 0.1, unit: 'kWh',
+        start: '2026-10-27T00:00:00Z', end: '2026-10-27T00:02:00Z',
+        included_interval_count: 2, coverage: 'complete', coverage_ratio: 1, data_stale: false,
+      },
+    ],
+    meta: { generated_at: '2026-10-27T00:03:00Z', start: '2026-10-27T00:00:00Z', end: '2026-10-27T00:02:00Z', next_cursor: null },
+  },
+  devices: {
+    data: [
+      {
+        device_id: 'A-01', building_id: 'BLD-A', name: 'Công tơ A-01', enabled: true,
+        status: 'online', last_seen: '2026-10-27T00:02:01Z', latest_event_time: '2026-10-27T00:02:00Z', data_stale: false, period_seconds: 60,
+      },
+      {
+        device_id: 'A-02', building_id: 'BLD-A', name: 'Công tơ A-02', enabled: true,
+        status: 'offline', last_seen: '2026-10-26T23:59:00Z', latest_event_time: '2026-10-26T23:59:00Z', data_stale: true, period_seconds: 60,
+      },
+      {
+        device_id: 'B-01', building_id: 'BLD-B', name: 'Công tơ B-01', enabled: true,
+        status: 'online', last_seen: '2026-10-27T00:02:01Z', latest_event_time: '2026-10-27T00:02:00Z', data_stale: false, period_seconds: 60,
+      },
+      {
+        device_id: 'X-01', building_id: 'BLD-A', name: 'Công tơ chưa gửi dữ liệu', enabled: true,
+        status: 'unknown', last_seen: null, latest_event_time: null, data_stale: true, period_seconds: 60,
+      },
+      {
+        device_id: 'B-02', building_id: 'BLD-B', name: 'Công tơ đã tắt', enabled: false,
+        status: 'disabled', last_seen: '2026-10-27T00:00:00Z', latest_event_time: '2026-10-27T00:00:00Z', data_stale: true, period_seconds: 60,
+      },
+    ],
+    meta: { generated_at: '2026-10-27T00:03:00Z', next_cursor: null },
+  },
+  readings: {
+    data: [
+      {
+        message_id: '00000000-0000-4000-8000-000000000014', device_id: 'A-01', building_id: 'BLD-A', metric: 'power_kw',
+        event_time: '2026-10-26T23:58:00Z', received_at: '2026-10-27T00:02:20Z', interval_start: null,
+        value: 11, unit: 'kW', is_late: true, is_out_of_order: true,
+      },
+      {
+        message_id: '00000000-0000-4000-8000-000000000013', device_id: 'A-01', building_id: 'BLD-A', metric: 'power_kw',
+        event_time: '2026-10-27T00:00:00Z', received_at: '2026-10-27T00:02:10Z', interval_start: null,
+        value: 8, unit: 'kW', is_late: false, is_out_of_order: true,
+      },
+      {
+        message_id: '00000000-0000-4000-8000-000000000011', device_id: 'A-01', building_id: 'BLD-A', metric: 'power_kw',
+        event_time: '2026-10-27T00:01:00Z', received_at: '2026-10-27T00:01:01Z', interval_start: null,
+        value: 9.9, unit: 'kW', is_late: false, is_out_of_order: false,
+      },
+      {
+        message_id: '00000000-0000-4000-8000-000000000012', device_id: 'A-01', building_id: 'BLD-A', metric: 'power_kw',
+        event_time: '2026-10-27T00:02:00Z', received_at: '2026-10-27T00:02:01Z', interval_start: null,
+        value: 10.1, unit: 'kW', is_late: false, is_out_of_order: false,
+      },
+    ],
+    meta: {
+      generated_at: '2026-10-27T00:03:00Z', device_id: 'A-01', metric: 'power_kw',
+      start: '2026-10-26T23:57:00Z', end: '2026-10-27T00:03:00Z', next_cursor: null,
+    },
+  },
+  alerts: {
+    data: [
+      {
+        alert_id: 'alert-0001', message_id: '00000000-0000-4000-8000-000000000012', device_id: 'A-01', building_id: 'BLD-A',
+        event_time: '2026-10-27T00:02:00Z', detected_at: '2026-10-27T00:02:01Z', metric: 'power_kw',
+        value: 10.1, threshold: 10, unit: 'kW', description: 'Cảnh báo mẫu do nguồn dữ liệu cung cấp.',
+      },
+    ],
+    meta: { generated_at: '2026-10-27T00:03:00Z', building_id: null, device_id: null, next_cursor: null },
+  },
+} satisfies DashboardFixture
