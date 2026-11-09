@@ -1,0 +1,77 @@
+name: QA
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      backend_ready:
+        description: 'Run real Backend tests (requires Backend merged into this checkout)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fixtures:
+    name: Documents and MQTT fixtures
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check JSON, local links, Python syntax and diff
+        run: python3 tools/scripts/check_repo.py
+      - name: Check proposed MQTT fixtures and oracle
+        run: python3 -m unittest discover -s tests/integration -p 'test_contract_*.py' -v
+
+  infrastructure:
+    name: PostgreSQL and MQTT smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 tools/scripts/dev.py init
+      - run: python3 tools/scripts/dev.py config
+      - run: python3 tools/scripts/dev.py up
+      - run: python3 tools/scripts/dev.py smoke
+      - if: always()
+        run: python3 tools/scripts/dev.py down
+
+  backend:
+    name: Backend migration and API integration
+    if: github.event_name == 'workflow_dispatch' && inputs.backend_ready
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 tools/scripts/dev.py init
+      - name: Test the real Backend in a disposable database
+        run: python3 tools/scripts/backend_qa.py
+      - name: Save test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-qa-evidence
+          path: build/qa/
+          retention-days: 7
+          if-no-files-found: warn
+      - if: always()
+        run: >-
+          docker compose --project-name app05-ngoc-qa --env-file .env
+          -f infrastructure/docker/compose.yml
+          -f infrastructure/docker/compose.backend-qa.yml down
+
+# MQTT end-to-end cannot be enabled until the real worker is supplied.
+# A successful fixtures/infra job is NOT evidence of worker ingestion success.
