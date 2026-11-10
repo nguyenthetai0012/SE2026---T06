@@ -33,7 +33,7 @@ Trạng thái: đối chiếu triển khai Frontend với `docs/contracts/mvp-ap
 ## Cần xác nhận trong Issue #21
 
 - Tài xác nhận request/response, metadata và lỗi ở phía Backend.
-- An xác nhận ý nghĩa metric, thời gian đo/nhận và các cờ từ MQTT/S imulator.
+- An xác nhận ý nghĩa metric, thời gian đo/nhận và các cờ từ MQTT/Simulator.
 - Ngọc xác nhận fixture/oracle và cách kiểm thử tích hợp.
 - Sương xác nhận mapping màn hình/view model và hành vi mock/API nêu trong tài liệu này.
 
