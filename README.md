@@ -88,6 +88,6 @@ Các tài liệu nguồn được cung cấp ngoài repo; README tách yêu cầ
 
 ## Bộ tài liệu MVP tổng hợp — đề xuất duyệt chung
 
-Bắt đầu từ [baseline MVP](docs/decisions/mvp-baseline.md), có stack, kiến trúc, MQTT, API, Frontend/mock, test oracle và thứ tự triển khai. Bộ này giải quyết cụ thể các câu hỏi mở bên trên, **chưa tự nhận là đã được nhóm phê duyệt**. Tài điều phối review/merge; sau khi chấp nhận, dùng bộ này làm cơ sở code thay các draft cũ.
+Bắt đầu từ [baseline MVP](docs/decisions/mvp-baseline.md), có stack, kiến trúc, MQTT, API, Frontend/mock, test oracle và thứ tự triển khai. Bộ này giải quyết cụ thể các câu hỏi mở bên trên, **đã được merge (PR #27) và được Tài, An xác nhận; Sương và Ngọc chưa xác nhận trên PR** nên phần của họ vẫn là đề xuất. Tài điều phối review/merge; sau khi chấp nhận, dùng bộ này làm cơ sở code thay các draft cũ.
 
 [Dữ liệu nghiệm thu JSON](docs/testing/fixtures/mvp-normal.json) có 12 readings và kết quả kỳ vọng; đã kiểm tra phép tính fixture, chưa chạy qua Backend. [Hướng dẫn tích hợp](docs/tasks/mvp-implementation.md) ghi rõ các lệnh mục tiêu chưa được kiểm chứng trên ứng dụng.
