@@ -3,7 +3,7 @@ import type { ApiEnvelope, ApiErrorEnvelope, AlertDto, BuildingSummaryDto, Devic
 import type { Alert, AlertsQuery, BuildingSummary, Device, DevicesQuery, Page, Reading, ReadingsQuery, SummaryQuery, TimeRange } from './models'
 import { RepositoryError, type DashboardRepository } from './repository'
 
-/** Proposed PR #27 endpoints, isolated here until the baseline/API contract is accepted. */
+/** HTTP endpoints follow docs/contracts/mvp-api.md on main; transport mapping stays isolated here. */
 export class HttpDashboardRepository implements DashboardRepository {
   constructor(
     private readonly baseUrl: string,
