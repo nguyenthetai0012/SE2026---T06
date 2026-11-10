@@ -1,6 +1,6 @@
 # Frontend APP-05
 
-Ứng dụng web React + TypeScript + Vite theo lựa chọn trong baseline [PR #27](https://github.com/nguyenthetai0012/SE2026---T06/pull/27). PR #27 đang mở và baseline còn `PROPOSED`; scaffold này dùng lựa chọn stack theo yêu cầu Issue #11 để phát triển riêng, không đánh dấu các DTO/API là contract đã duyệt.
+Ứng dụng web React + TypeScript + Vite theo stack được ghi trong baseline MVP trên `main` ([PR #27](https://github.com/nguyenthetai0012/SE2026---T06/pull/27)). DTO/API phía Frontend đối chiếu `docs/contracts/mvp-api.md` và OpenAPI sinh từ Backend; trạng thái baseline hiện được ghi tại [PR #32](https://github.com/nguyenthetai0012/SE2026---T06/pull/32).
 
 ## Yêu cầu môi trường
 
