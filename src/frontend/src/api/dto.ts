@@ -1,7 +1,7 @@
 /**
- * Proposed wire DTOs copied from PR #27's mvp-api.md.
- * Keep these types and their mapper at the transport boundary until that PR is
- * accepted; UI components consume view models instead of depending on fields.
+ * Wire DTOs mirror docs/contracts/mvp-api.md on main and the generated OpenAPI.
+ * Keep transport fields and mapping at this boundary; UI components consume
+ * view models instead of depending on wire-format fields.
  */
 export type Timestamp = string
 export type Metric = 'power_kw' | 'energy_kwh'
