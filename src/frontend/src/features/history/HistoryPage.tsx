@@ -18,17 +18,17 @@ export function HistoryPage({ repository, deviceId }: { repository: DashboardRep
       <PageTitle id="history-title" eyebrow="LỊCH SỬ CẢM BIẾN" title={`Lịch sử · ${deviceId}`} description="Trục thời gian dùng thời điểm đo; dữ liệu đến trễ và sai thứ tự được gắn cờ theo phản hồi nguồn." action={<AppLink className="button button-quiet" to="/devices">← Danh sách thiết bị</AppLink>} />
       <div className="toolbar history-toolbar"><label className="filter-label">Thông số <select aria-label="Chọn thông số" value={metric} onChange={(event) => setMetric(event.target.value as Metric)}><option value="power_kw">Công suất</option><option value="energy_kwh">Điện năng</option></select></label><TimeRangeForm key={`${deviceId}-${metric}`} initial={range} onApply={setRange} /></div>
       <QueryPanel state={query} retry={query.retry} isEmpty={(page) => page.items.length === 0} emptyText="Không có bản ghi phù hợp với thiết bị, thông số và khoảng thời gian đã chọn.">
-        {(page) => <HistoryResults readings={page.items} nextCursor={page.meta.nextCursor} />}
+        {(page) => <HistoryResults readings={page.items} nextCursor={page.meta.nextCursor} range={range} />}
       </QueryPanel>
     </section>
   )
 }
 
-function HistoryResults({ readings, nextCursor }: { readings: Reading[]; nextCursor: string | null }) {
+function HistoryResults({ readings, nextCursor, range }: { readings: Reading[]; nextCursor: string | null; range: TimeRange }) {
   return (
     <>
       <div className="history-summary"><span>{readings.length} điểm dữ liệu trong trang hiện tại</span>{nextCursor && <span className="pagination-note">Còn dữ liệu chưa tải · cursor được nguồn cung cấp</span>}</div>
-      <div className="chart-card"><div className="chart-heading"><div><p className="eyebrow">DIỄN BIẾN</p><h2>Giá trị theo thời điểm đo</h2></div><span className="unit-tag">{readings[0]?.unit ?? ''}</span></div><HistoryChart readings={readings} /></div>
+      <div className="chart-card"><div className="chart-heading"><div><p className="eyebrow">DIỄN BIẾN</p><h2>Giá trị theo thời điểm đo</h2></div><span className="unit-tag">{readings[0]?.unit ?? ''}</span></div><HistoryChart readings={readings} range={range} /></div>
       <div className="table-wrap"><table><caption>Bảng dữ liệu cảm biến, giữ nguyên đơn vị và cờ do nguồn cung cấp</caption><thead><tr><th scope="col">Thời điểm đo</th><th scope="col">Giá trị</th><th scope="col">Thời điểm nhận</th><th scope="col">Chất lượng dữ liệu</th></tr></thead><tbody>
         {readings.map((reading) => <tr key={reading.messageId}><td>{formatDateTime(reading.eventTime)}</td><td><strong>{formatNumber(reading.value)}</strong> {reading.unit}</td><td>{formatDateTime(reading.receivedAt)}</td><td><div className="flag-list">{reading.isLate && <span className="flag flag-late">Đến trễ</span>}{reading.isOutOfOrder && <span className="flag flag-order">Sai thứ tự nhận</span>}{!reading.isLate && !reading.isOutOfOrder && <span className="muted-label">Bình thường</span>}</div></td></tr>)}
       </tbody></table></div>
@@ -37,14 +37,20 @@ function HistoryResults({ readings, nextCursor }: { readings: Reading[]; nextCur
   )
 }
 
-function HistoryChart({ readings }: { readings: Reading[] }) {
+function HistoryChart({ readings, range }: { readings: Reading[]; range: TimeRange }) {
   if (readings.length === 0) return null
   const values = readings.map((reading) => reading.value)
   const low = Math.min(...values)
   const high = Math.max(...values)
   const span = high - low || 1
-  const points = readings.map((reading, index) => {
-    const x = readings.length === 1 ? 50 : 8 + index * (84 / (readings.length - 1))
+  const startMs = Date.parse(range.start)
+  const endMs = Date.parse(range.end)
+  const duration = endMs - startMs
+  const xFor = (eventTime: string) => duration > 0
+    ? 8 + Math.max(0, Math.min(1, (Date.parse(eventTime) - startMs) / duration)) * 84
+    : 50
+  const points = readings.map((reading) => {
+    const x = xFor(reading.eventTime)
     const y = 82 - ((reading.value - low) / span) * 62
     return `${x},${y}`
   }).join(' ')
@@ -54,8 +60,8 @@ function HistoryChart({ readings }: { readings: Reading[] }) {
       <svg className="line-chart" viewBox="0 0 100 100" role="img" aria-label={`Biểu đồ ${readings.length} điểm dữ liệu, đơn vị ${readings[0].unit}`}>
         <line x1="6" y1="20" x2="94" y2="20" className="chart-gridline" /><line x1="6" y1="51" x2="94" y2="51" className="chart-gridline" /><line x1="6" y1="82" x2="94" y2="82" className="chart-gridline" />
         <polyline points={points} className="chart-line" />
-        {readings.map((reading, index) => {
-          const x = readings.length === 1 ? 50 : 8 + index * (84 / (readings.length - 1))
+        {readings.map((reading) => {
+          const x = xFor(reading.eventTime)
           const y = 82 - ((reading.value - low) / span) * 62
           return <circle key={reading.messageId} cx={x} cy={y} r="2.2" className={reading.isLate ? 'chart-point chart-point-late' : 'chart-point'}><title>{`${formatDateTime(reading.eventTime)} · ${formatNumber(reading.value)} ${reading.unit}${reading.isLate ? ' · đến trễ' : ''}`}</title></circle>
         })}
