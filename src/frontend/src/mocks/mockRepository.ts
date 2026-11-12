@@ -38,7 +38,7 @@ export class MockDashboardRepository implements DashboardRepository {
     const data = this.scenario === 'empty'
       ? []
       : this.fixture.devices.data.filter((device) => !query.buildingId || device.building_id === query.buildingId)
-    return mapDevicePage({ ...this.fixture.devices, data })
+    return mapDevicePage({ ...this.fixture.devices, ...paginate(data, this.fixture.devices.meta, query) })
   }
 
   async getReadings(query: ReadingsQuery): Promise<Page<Reading>> {
@@ -52,8 +52,7 @@ export class MockDashboardRepository implements DashboardRepository {
           Date.parse(reading.event_time) >= start && Date.parse(reading.event_time) < end)
     return mapReadingPage({
       ...this.fixture.readings,
-      data,
-      meta: { ...this.fixture.readings.meta, device_id: query.deviceId, metric: query.metric, start: query.range.start, end: query.range.end },
+      ...paginate(data, { ...this.fixture.readings.meta, device_id: query.deviceId, metric: query.metric, start: query.range.start, end: query.range.end }, query),
     })
   }
 
@@ -64,7 +63,7 @@ export class MockDashboardRepository implements DashboardRepository {
       : this.fixture.alerts.data.filter((alert) =>
           (!query.buildingId || alert.building_id === query.buildingId) &&
           (!query.deviceId || alert.device_id === query.deviceId))
-    return mapAlertPage({ ...this.fixture.alerts, data })
+    return mapAlertPage({ ...this.fixture.alerts, ...paginate(data, this.fixture.alerts.meta, query) })
   }
 
   private async beforeRequest(key: string): Promise<void> {
@@ -84,4 +83,11 @@ export class MockDashboardRepository implements DashboardRepository {
 
 function pause(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms))
+}
+
+function paginate<T, M extends { next_cursor?: string | null }>(data: T[], meta: M, query: { cursor?: string | null; limit?: number }) {
+  const offset = query.cursor ? Number(query.cursor) : 0
+  const limit = query.limit ?? 100
+  const end = offset + limit
+  return { data: data.slice(offset, end), meta: { ...meta, next_cursor: end < data.length ? String(end) : null } }
 }
