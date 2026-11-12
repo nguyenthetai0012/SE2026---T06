@@ -4,17 +4,41 @@ Khung Backend theo [baseline MVP](../../docs/decisions/mvp-baseline.md): FastAPI
 Phạm vi PR này: **schema DB, migration, seed registry, DTO/OpenAPI và các API đọc**. Chưa có worker ingestion MQTT, Docker Compose hay CI (bước 2B và 1D).
 Contract: [`mvp-api.md`](../../docs/contracts/mvp-api.md); OpenAPI sinh từ code: [`mvp-openapi.json`](../../docs/contracts/mvp-openapi.json).
 
+## Môi trường đã kiểm chứng
+
+| Thành phần | Phiên bản | Ghi chú |
+| --- | --- | --- |
+| Python | 3.12.10 | `requires-python = ">=3.12"` trong `pyproject.toml` |
+| PostgreSQL | 16.15 | extension `btree_gist` 1.7 (gói contrib) |
+| Hệ điều hành | Windows 11 | kiểm chứng ngày 2026-11-12: migration, seed, pytest, `export_openapi.py --check` |
+
+Linux/Docker: **chưa xác minh**. Compose/CI là bước 1D.
+
 ## Chạy
 
-Cần Python 3.12 và PostgreSQL 16 có extension `btree_gist` (có sẵn trong gói contrib).
+Cần PostgreSQL 16 có extension `btree_gist` và quyền `CREATE EXTENSION` cho lần `alembic upgrade head` đầu tiên.
+
+Linux/macOS (bash):
 
 ```bash
 cd src/backend
 python3.12 -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
 export DATABASE_URL='postgresql+psycopg://USER:PASSWORD@localhost:5432/energy'   # xem .env.example
-alembic upgrade head                      # tạo schema (cần quyền CREATE EXTENSION cho lần đầu)
+alembic upgrade head                      # tạo schema
 python -m app.seed                        # nạp registry từ seed/registry.json, chạy lại không nhân bản
+uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000
+```
+
+Windows (PowerShell):
+
+```powershell
+cd src/backend
+py -3.12 -m venv .venv; .venv\Scripts\Activate.ps1
+pip install -r requirements-dev.txt
+$env:DATABASE_URL = 'postgresql+psycopg://USER:PASSWORD@localhost:5432/energy'
+alembic upgrade head
+python -m app.seed
 uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000
 ```
 
@@ -22,11 +46,18 @@ Biến môi trường: `DATABASE_URL` (bắt buộc, không có mặc định), 
 
 ## Kiểm thử
 
+`TEST_DATABASE_URL` phải trỏ tới database riêng có tên chứa "test", vì fixture sẽ `DROP SCHEMA public`.
+
 ```bash
-# TEST_DATABASE_URL phải trỏ tới database riêng, tên chứa "test": fixture sẽ DROP SCHEMA public.
 export TEST_DATABASE_URL='postgresql+psycopg://USER:PASSWORD@localhost:5432/energy_test'
-cd src/backend && pytest                  # 67 test contract trên PostgreSQL thật, schema dựng bằng Alembic
+cd src/backend && pytest                  # 76 test contract trên PostgreSQL thật, schema dựng bằng Alembic
 python ../../tools/scripts/export_openapi.py --check   # file OpenAPI đã commit phải khớp app
+```
+
+```powershell
+$env:TEST_DATABASE_URL = 'postgresql+psycopg://USER:PASSWORD@localhost:5432/energy_test'
+cd src/backend; pytest
+python ..\..\tools\scripts\export_openapi.py --check
 ```
 
 Test dùng [`mvp-normal.json`](../../docs/testing/fixtures/mvp-normal.json) làm oracle (BLD-A 0.6 kWh, BLD-B 0.1 kWh, 2 alerts) và các biến thể trong ma trận [`mvp-acceptance.md`](../../docs/testing/mvp-acceptance.md): coverage partial, thiết bị disabled, null khác 0, biên `[start,end)` và `[start,end]`, biên offline/stale `>= 3*period`, phân trang, cursor không khớp, lỗi 404/422/503.
