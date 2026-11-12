@@ -27,7 +27,7 @@ describe('Dashboard mock-first UI', () => {
   it('AC-03/AC-06/AC-10: shows ordered history rows and source late/out-of-order flags', async () => {
     renderDashboard('normal', '/devices/A-01/history')
     await screen.findByRole('table', { name: /bảng dữ liệu cảm biến/i })
-    expect(screen.getByText('Đến trễ')).toBeInTheDocument()
+    expect(screen.getAllByText('Đến trễ')).toHaveLength(2)
     expect(screen.getAllByText('Sai thứ tự nhận').length).toBeGreaterThan(0)
     const rows = screen.getAllByRole('row')
     expect(rows[1]).toHaveTextContent('11 kW')
