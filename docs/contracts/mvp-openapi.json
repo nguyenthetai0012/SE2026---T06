@@ -682,6 +682,53 @@
       "get": {
         "description": "Cảnh báo (chỉ đọc); query: building_id, device_id, limit, cursor.",
         "operationId": "alerts_api_v1_alerts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "building_id",
+            "required": false,
+            "schema": {
+              "description": "Lọc theo tòa nhà; đúng định dạng nhưng không tồn tại -> 404.",
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "device_id",
+            "required": false,
+            "schema": {
+              "description": "Lọc theo thiết bị; không thuộc building_id -> 422 FILTER_MISMATCH.",
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "description": "Số bản ghi tối đa mỗi trang.",
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "description": "Cursor opaque lấy từ meta.next_cursor của trang trước.",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -713,6 +760,16 @@
             },
             "description": "INVALID_QUERY, FILTER_MISMATCH hoặc INVALID_CURSOR"
           },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
+          },
           "503": {
             "content": {
               "application/json": {
@@ -734,6 +791,42 @@
       "get": {
         "description": "Tổng điện năng ghi nhận theo tòa nhà trong [start,end]; query: start, end (bắt buộc), building_id.",
         "operationId": "buildings_summary_api_v1_buildings_summary_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "description": "Mốc đầu, ISO 8601 UTC kết thúc bằng 'Z'; phải nhỏ hơn end.",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?Z$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "description": "Mốc cuối, ISO 8601 UTC kết thúc bằng 'Z'.",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?Z$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "building_id",
+            "required": false,
+            "schema": {
+              "description": "Lọc theo tòa nhà; đúng định dạng nhưng không tồn tại -> 404.",
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -765,6 +858,16 @@
             },
             "description": "INVALID_QUERY, FILTER_MISMATCH hoặc INVALID_CURSOR"
           },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
+          },
           "503": {
             "content": {
               "application/json": {
@@ -786,6 +889,41 @@
       "get": {
         "description": "Danh sách thiết bị; query: building_id, limit, cursor.",
         "operationId": "devices_api_v1_devices_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "building_id",
+            "required": false,
+            "schema": {
+              "description": "Lọc theo tòa nhà; đúng định dạng nhưng không tồn tại -> 404.",
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "description": "Số bản ghi tối đa mỗi trang.",
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "description": "Cursor opaque lấy từ meta.next_cursor của trang trước.",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -817,6 +955,16 @@
             },
             "description": "INVALID_QUERY, FILTER_MISMATCH hoặc INVALID_CURSOR"
           },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
+          },
           "503": {
             "content": {
               "application/json": {
@@ -845,6 +993,62 @@
             "required": true,
             "schema": {
               "title": "Device Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "metric",
+            "required": true,
+            "schema": {
+              "description": "Thông số cần lấy lịch sử.",
+              "enum": [
+                "power_kw",
+                "energy_kwh"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "description": "Mốc đầu, ISO 8601 UTC kết thúc bằng 'Z'; phải nhỏ hơn end.",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?Z$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "description": "Mốc cuối, ISO 8601 UTC kết thúc bằng 'Z'.",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?Z$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "description": "Số bản ghi tối đa mỗi trang.",
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "description": "Cursor opaque lấy từ meta.next_cursor của trang trước.",
               "type": "string"
             }
           }
@@ -879,6 +1083,16 @@
               }
             },
             "description": "INVALID_QUERY, FILTER_MISMATCH hoặc INVALID_CURSOR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
           },
           "503": {
             "content": {

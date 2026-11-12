@@ -20,7 +20,7 @@ from . import queries
 from .config import Settings
 from .db import make_engine
 from .errors import ApiError
-from .params import parse_id, parse_limit, parse_metric, parse_range, read_query
+from .params import openapi_query, parse_id, parse_limit, parse_metric, parse_range, read_query
 from .schemas import (
     AlertListResponse, DeviceListResponse, ErrorResponse, HistoryResponse, ReadyResponse, SummaryResponse,
 )
@@ -32,7 +32,13 @@ ERR = {
     404: {"model": ErrorResponse, "description": "NOT_FOUND"},
     422: {"model": ErrorResponse, "description": "INVALID_QUERY, FILTER_MISMATCH hoặc INVALID_CURSOR"},
     503: {"model": ErrorResponse, "description": "DEPENDENCY_UNAVAILABLE"},
+    500: {"model": ErrorResponse, "description": "INTERNAL_ERROR"},
 }
+# Tên query parameter mỗi route chấp nhận: dùng chung cho read_query (validate) và OpenAPI (schema) để không lệch.
+SUMMARY_Q = ("start", "end", "building_id")
+DEVICES_Q = ("building_id", "limit", "cursor")
+HISTORY_Q = ("metric", "start", "end", "limit", "cursor")
+ALERTS_Q = ("building_id", "device_id", "limit", "cursor")
 
 
 def _error(request: Request, status: int, code: str, message: str) -> JSONResponse:
@@ -94,10 +100,11 @@ def create_app(settings: Settings | None = None, clock: Callable[[], datetime] |
 
     router = APIRouter(prefix="/api/v1")
 
-    @router.get("/buildings/summary", response_model=SummaryResponse, responses=ERR, tags=["buildings"])
+    @router.get("/buildings/summary", response_model=SummaryResponse, responses=ERR, tags=["buildings"],
+                openapi_extra=openapi_query(*SUMMARY_Q))
     def buildings_summary(request: Request, db: Session = Depends(get_db)):
         """Tổng điện năng ghi nhận theo tòa nhà trong [start,end]; query: start, end (bắt buộc), building_id."""
-        q = read_query(request, {"start", "end", "building_id"})
+        q = read_query(request, set(SUMMARY_Q))
         start, end = parse_range(q)
         building_id = parse_id(q["building_id"], "building_id") if "building_id" in q else None
         generated_at = now()
@@ -105,21 +112,23 @@ def create_app(settings: Settings | None = None, clock: Callable[[], datetime] |
         return {"data": data, "meta": {"generated_at": generated_at, "start": start, "end": end,
                                        "building_id": building_id, "next_cursor": None}}
 
-    @router.get("/devices", response_model=DeviceListResponse, responses=ERR, tags=["devices"])
+    @router.get("/devices", response_model=DeviceListResponse, responses=ERR, tags=["devices"],
+                openapi_extra=openapi_query(*DEVICES_Q))
     def devices(request: Request, db: Session = Depends(get_db)):
         """Danh sách thiết bị; query: building_id, limit, cursor."""
-        q = read_query(request, {"building_id", "limit", "cursor"})
+        q = read_query(request, set(DEVICES_Q))
         building_id = parse_id(q["building_id"], "building_id") if "building_id" in q else None
         limit = parse_limit(q)
         generated_at = now()
         data, nxt = queries.list_devices(db, building_id, limit, q.get("cursor"), generated_at)
         return {"data": data, "meta": {"generated_at": generated_at, "building_id": building_id, "next_cursor": nxt}}
 
-    @router.get("/devices/{device_id}/readings", response_model=HistoryResponse, responses=ERR, tags=["devices"])
+    @router.get("/devices/{device_id}/readings", response_model=HistoryResponse, responses=ERR, tags=["devices"],
+                openapi_extra=openapi_query(*HISTORY_Q))
     def device_readings(device_id: str, request: Request, db: Session = Depends(get_db)):
         """Lịch sử reading theo event_time trong [start,end); query: metric, start, end (bắt buộc), limit, cursor."""
         parse_id(device_id, "device_id")
-        q = read_query(request, {"metric", "start", "end", "limit", "cursor"})
+        q = read_query(request, set(HISTORY_Q))
         metric = parse_metric(q)
         start, end = parse_range(q)
         limit = parse_limit(q)
@@ -128,10 +137,11 @@ def create_app(settings: Settings | None = None, clock: Callable[[], datetime] |
         return {"data": data, "meta": {"generated_at": generated_at, "device_id": device_id, "metric": metric,
                                        "start": start, "end": end, "next_cursor": nxt}}
 
-    @router.get("/alerts", response_model=AlertListResponse, responses=ERR, tags=["alerts"])
+    @router.get("/alerts", response_model=AlertListResponse, responses=ERR, tags=["alerts"],
+                openapi_extra=openapi_query(*ALERTS_Q))
     def alerts(request: Request, db: Session = Depends(get_db)):
         """Cảnh báo (chỉ đọc); query: building_id, device_id, limit, cursor."""
-        q = read_query(request, {"building_id", "device_id", "limit", "cursor"})
+        q = read_query(request, set(ALERTS_Q))
         building_id = parse_id(q["building_id"], "building_id") if "building_id" in q else None
         device_id = parse_id(q["device_id"], "device_id") if "device_id" in q else None
         limit = parse_limit(q)

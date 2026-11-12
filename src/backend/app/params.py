@@ -71,3 +71,32 @@ def parse_metric(q: dict[str, str]) -> str:
     if metric not in METRICS:
         raise invalid_query("metric phải là power_kw hoặc energy_kwh")
     return metric
+
+
+# Mô tả query parameter cho OpenAPI (docs/contracts/mvp-api.md). Chỉ dùng qua openapi_extra để sinh schema;
+# việc validate vẫn do read_query/parse_* ở trên, nên mã lỗi và thông báo không đổi.
+def _ts(desc: str) -> dict:
+    return {"type": "string", "format": "date-time", "pattern": TS_RE.pattern, "description": desc}
+
+
+def _id(desc: str) -> dict:
+    return {"type": "string", "minLength": 1, "maxLength": 64, "pattern": ID_RE.pattern, "description": desc}
+
+
+_QUERY_SPECS: dict[str, tuple[bool, dict]] = {
+    "start": (True, _ts("Mốc đầu, ISO 8601 UTC kết thúc bằng 'Z'; phải nhỏ hơn end.")),
+    "end": (True, _ts("Mốc cuối, ISO 8601 UTC kết thúc bằng 'Z'.")),
+    "metric": (True, {"type": "string", "enum": list(METRICS), "description": "Thông số cần lấy lịch sử."}),
+    "building_id": (False, _id("Lọc theo tòa nhà; đúng định dạng nhưng không tồn tại -> 404.")),
+    "device_id": (False, _id("Lọc theo thiết bị; không thuộc building_id -> 422 FILTER_MISMATCH.")),
+    "limit": (False, {"type": "integer", "minimum": 1, "maximum": MAX_LIMIT, "default": DEFAULT_LIMIT,
+                      "description": "Số bản ghi tối đa mỗi trang."}),
+    "cursor": (False, {"type": "string", "description": "Cursor opaque lấy từ meta.next_cursor của trang trước."}),
+}
+
+
+def openapi_query(*names: str) -> dict:
+    """openapi_extra cho một route: khai báo đúng các tên mà route đó truyền vào read_query."""
+    return {"parameters": [
+        {"name": n, "in": "query", "required": _QUERY_SPECS[n][0], "schema": _QUERY_SPECS[n][1]} for n in names
+    ]}
