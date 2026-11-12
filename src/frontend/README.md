@@ -34,3 +34,5 @@ npm run build
 ```
 
 `dist/` và `node_modules/` là đầu ra cục bộ, không commit. Không dùng dữ liệu mock để suy ra công thức năng lượng, ngưỡng cảnh báo hoặc chính sách online/offline.
+
+Test đơn vị Vitest tạm đặt tại `src/frontend/src/test/` theo quyết định của Tài trong PR #29; test tích hợp và E2E đặt tại `tests/`. Ngoại lệ này cần được ghi nhận trong quy ước dự án.
