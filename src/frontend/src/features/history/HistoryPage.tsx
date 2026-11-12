@@ -67,7 +67,7 @@ function HistoryChart({ readings, range }: { readings: Reading[]; range: TimeRan
         })}
       </svg>
       <span className="chart-min">{formatNumber(low)}</span>
-      <div className="chart-axis"><span>{formatDateTime(readings[0].eventTime)}</span><span>{formatDateTime(readings[readings.length - 1].eventTime)}</span></div>
+      <div className="chart-axis"><span>{formatDateTime(range.start)}</span><span>{formatDateTime(range.end)}</span></div>
     </div>
   )
 }
