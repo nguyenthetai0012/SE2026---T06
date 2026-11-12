@@ -16,7 +16,7 @@ export const dashboardFixture = {
       {
         building_id: 'BLD-A', name: 'Tòa nhà A', energy_kwh: 0.5, unit: 'kWh',
         start: '2026-10-27T00:00:00Z', end: '2026-10-27T00:02:00Z',
-        included_interval_count: 3, coverage: 'partial', coverage_ratio: 0.75, data_stale: false,
+        included_interval_count: 3, coverage: 'partial', coverage_ratio: 0.5, data_stale: true,
       },
       {
         building_id: 'BLD-B', name: 'Tòa nhà B', energy_kwh: 0.1, unit: 'kWh',
@@ -61,7 +61,7 @@ export const dashboardFixture = {
       {
         message_id: '00000000-0000-4000-8000-000000000013', device_id: 'A-01', building_id: 'BLD-A', metric: 'power_kw',
         event_time: '2026-10-27T00:00:00Z', received_at: '2026-10-27T00:02:10Z', interval_start: null,
-        value: 8, unit: 'kW', is_late: false, is_out_of_order: true,
+        value: 8, unit: 'kW', is_late: true, is_out_of_order: true,
       },
       {
         message_id: '00000000-0000-4000-8000-000000000011', device_id: 'A-01', building_id: 'BLD-A', metric: 'power_kw',
