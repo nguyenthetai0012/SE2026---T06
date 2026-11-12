@@ -18,6 +18,9 @@ from app.config import Settings  # noqa: E402
 from app.main import create_app  # noqa: E402
 
 OUT = ROOT / "docs" / "contracts" / "mvp-openapi.json"
+# Thông báo in ra chỉ dùng ASCII (kể cả đường dẫn, lấy tương đối theo repo): trên Windows cp1252, stdout bị
+# pipe/redirect sẽ crash UnicodeEncodeError với ký tự tiếng Việt.
+REL = OUT.relative_to(ROOT).as_posix()
 
 
 def main() -> int:
@@ -28,12 +31,12 @@ def main() -> int:
     text = json.dumps(app.openapi(), ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     if args.check:
         if not OUT.exists() or json.loads(OUT.read_text(encoding="utf-8")) != json.loads(text):
-            print(f"{OUT} lệch với app; chạy lại script không kèm --check.", file=sys.stderr)
+            print(f"{REL} is out of date with the app; rerun this script without --check.", file=sys.stderr)
             return 1
-        print("openapi khớp")
+        print(f"{REL} matches the app")
         return 0
     OUT.write_text(text, encoding="utf-8")
-    print(f"đã ghi {OUT}")
+    print(f"wrote {REL}")
     return 0
 
 
