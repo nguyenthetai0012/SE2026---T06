@@ -40,3 +40,52 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  frontend-backend:
+    name: Frontend with Backend API and PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: app05
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: app05_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app05 -d app05_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+psycopg://app05:ci-only-password@localhost:5432/app05_test
+      VITE_TEST_API_URL: http://127.0.0.1:8000/api/v1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: src/frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+      - name: Set up Backend and seed registry
+        working-directory: src/backend
+        run: |
+          python -m pip install -r requirements.txt
+          alembic upgrade head
+          python -m app.seed
+          uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000 > /tmp/app05-api.log 2>&1 &
+          curl --fail --retry 20 --retry-delay 1 --retry-connrefused http://127.0.0.1:8000/api/v1/health/ready
+      - name: Install Frontend dependencies
+        working-directory: src/frontend
+        run: npm ci
+      - name: Test Frontend against Backend API
+        working-directory: src/frontend
+        run: npm run test:run -- src/test/backend-integration.test.tsx
+      - name: Show Backend log if integration fails
+        if: failure()
+        run: cat /tmp/app05-api.log || true
