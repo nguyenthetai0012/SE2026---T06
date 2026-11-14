@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import uuid4
 
+import pytest
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Alert, Reading
@@ -52,3 +54,67 @@ def test_successful_alert_sends_notification_after_commit(engine, db):
     result = process_reading(engine, event, sender)
     assert observed == [True]
     assert result.notification_status == "sent"
+
+
+@pytest.mark.parametrize("value,expected", [(Decimal("0"), "not_required"),
+    (Decimal("9.999"), "not_required"), (Decimal("10"), "not_required"),
+    (Decimal("10.001"), "sent")])
+def test_threshold_partitions(engine, db, value, expected):
+    from app.vt022_notification import process_reading
+    event = payload()
+    event["value_kw"] = value
+    sent = []
+    result = process_reading(engine, event, lambda alert: sent.append(alert.alert_id))
+    assert result.notification_status == expected
+    assert len(sent) == (1 if expected == "sent" else 0)
+    with Session(engine) as session:
+        assert session.get(Reading, event["message_id"]) is not None
+        assert session.query(Alert).filter_by(message_id=event["message_id"]).count() == len(sent)
+
+
+@pytest.mark.parametrize("invalid", [-1, "12", True, Decimal("NaN"), Decimal("Infinity")])
+def test_invalid_value_rejected_before_write(engine, db, invalid):
+    from app.vt022_notification import process_reading
+    event = payload()
+    event["value_kw"] = invalid
+    sent = []
+    with pytest.raises(ValueError):
+        process_reading(engine, event, sent.append)
+    with Session(engine) as session:
+        assert session.get(Reading, event["message_id"]) is None
+    assert sent == []
+
+
+def test_oversized_input_rejected_before_write(engine, db):
+    from app.vt022_notification import process_reading
+    event = payload()
+    event["device_id"] = "A" * 4097
+    sent = []
+    with pytest.raises(ValueError, match="size"):
+        process_reading(engine, event, sent.append)
+    assert sent == []
+    with Session(engine) as session:
+        assert session.get(Reading, event["message_id"]) is None
+
+
+def test_failed_database_insert_does_not_send_again(engine, db):
+    from app.vt022_notification import process_reading
+    event = payload()
+    process_reading(engine, event, lambda alert: None)
+    sent = []
+    with pytest.raises(IntegrityError):
+        process_reading(engine, event, sent.append)
+    assert sent == []
+    with Session(engine) as session:
+        assert session.query(Alert).filter_by(message_id=event["message_id"]).count() == 1
+
+
+def test_alert_api_maps_value_and_threshold(engine, client):
+    from app.vt022_notification import process_reading
+    event = payload()
+    process_reading(engine, event, lambda alert: None)
+    response = client.get("/api/v1/alerts", params={"device_id": "A-01"})
+    assert response.status_code == 200
+    item = next(item for item in response.json()["data"] if item["message_id"] == event["message_id"])
+    assert item["value"] == 12
+    assert item["threshold"] == 10
