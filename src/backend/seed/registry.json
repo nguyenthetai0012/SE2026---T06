@@ -1,0 +1,12 @@
+{
+  "_comment": "Registry demo của baseline MVP (docs/contracts/mvp-mqtt.md, mục Simulator và fixture). Tên hiển thị là dữ liệu seed, đổi qua PR.",
+  "buildings": [
+    {"building_id": "BLD-A", "name": "Building A"},
+    {"building_id": "BLD-B", "name": "Building B"}
+  ],
+  "devices": [
+    {"device_id": "A-01", "building_id": "BLD-A", "name": "Meter A1", "enabled": true, "period_seconds": 60, "power_threshold_kw": 10},
+    {"device_id": "A-02", "building_id": "BLD-A", "name": "Meter A2", "enabled": true, "period_seconds": 60, "power_threshold_kw": 10},
+    {"device_id": "B-01", "building_id": "BLD-B", "name": "Meter B1", "enabled": true, "period_seconds": 60, "power_threshold_kw": 10}
+  ]
+}
