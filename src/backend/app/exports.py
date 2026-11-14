@@ -186,18 +186,18 @@ class PgExportStore:
 def pg_row_source(db: Session) -> RowSource:
     def fetch(building_id: str, metric: str, start: datetime, end: datetime, limit: int) -> list[ExportRow]:
         # Scope áp ngay trong SQL (JOIN devices theo building), không lọc sau ở Python.
+        # Đọc cột trực tiếp (Core), không dựng object ORM: dựng 2880 object tốn ~63 ms CPU/export (đo ở BT3, mục tải).
         stmt = (
-            select(Reading, Device.building_id)
+            select(Reading.message_id, Reading.device_id, Device.building_id, Reading.metric, Reading.event_time,
+                   Reading.received_at, Reading.interval_start, Reading.value, Reading.is_late, Reading.is_out_of_order)
             .join(Device, Device.device_id == Reading.device_id)
             .where(Device.building_id == building_id, Reading.metric == metric,
                    Reading.event_time >= start, Reading.event_time < end)
             .order_by(Reading.event_time, Reading.message_id)
             .limit(limit)
         )
-        return [ExportRow(message_id=r.message_id, device_id=r.device_id, building_id=b, metric=r.metric,
-                          event_time=r.event_time, received_at=r.received_at, interval_start=r.interval_start,
-                          value=r.value, unit=UNIT[r.metric], is_late=r.is_late, is_out_of_order=r.is_out_of_order)
-                for r, b in db.execute(stmt)]
+        return [ExportRow(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], UNIT[r[3]], r[8], r[9])
+                for r in db.execute(stmt)]
     return fetch
 
 
