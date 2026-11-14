@@ -56,7 +56,7 @@ def load_registry(path: Path) -> dict:
 
 
 def apply_seed(db: Session, data: dict) -> dict[str, list[str]]:
-    """Upsert idempotent. Trả diff {inserted, updated, unchanged}. Không đổi building của device đã có readings."""
+    """Upsert idempotent. Trả diff {inserted, updated, unchanged}. Không đổi building/chu kỳ/ngưỡng của device đã có readings."""
     diff: dict[str, list[str]] = {"inserted": [], "updated": [], "unchanged": []}
     for b in data["buildings"]:
         row = db.get(Building, b["building_id"])
@@ -73,13 +73,15 @@ def apply_seed(db: Session, data: dict) -> dict[str, list[str]]:
         if row is None:
             db.add(Device(**{**d, "power_threshold_kw": threshold})); diff["inserted"].append(f"device:{d['device_id']}")
             continue
-        if row.building_id != d["building_id"]:
-            n = db.scalar(select(func.count()).select_from(Reading).where(Reading.device_id == row.device_id))
-            if n:
-                raise SeedError(f"không đổi building của {row.device_id}: đã có {n} readings (cần dataset mới)")
         changed = [k for k in ("building_id", "name", "enabled", "period_seconds") if getattr(row, k) != d[k]]
         if row.power_threshold_kw != threshold:
             changed.append("power_threshold_kw")
+        # Baseline: đổi building/chu kỳ/ngưỡng sau khi đã có dữ liệu cần dataset mới (không diễn giải lại dữ liệu cũ).
+        frozen = [k for k in ("building_id", "period_seconds", "power_threshold_kw") if k in changed]
+        if frozen:
+            n = db.scalar(select(func.count()).select_from(Reading).where(Reading.device_id == row.device_id))
+            if n:
+                raise SeedError(f"không đổi {', '.join(frozen)} của {row.device_id}: đã có {n} readings (cần dataset mới)")
         if changed:
             for k in changed:
                 setattr(row, k, threshold if k == "power_threshold_kw" else d[k])
