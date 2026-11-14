@@ -126,10 +126,36 @@ class ReadyResponse(Strict):
 
 
 class ErrorBody(Strict):
-    code: Literal["INVALID_QUERY", "FILTER_MISMATCH", "INVALID_CURSOR", "NOT_FOUND", "DEPENDENCY_UNAVAILABLE", "INTERNAL_ERROR"]
+    code: Literal["INVALID_QUERY", "FILTER_MISMATCH", "INVALID_CURSOR", "NOT_FOUND", "DEPENDENCY_UNAVAILABLE", "INTERNAL_ERROR",
+                  "UNAUTHENTICATED", "FORBIDDEN", "IDEMPOTENCY_CONFLICT", "EXPORT_TOO_LARGE"]
     message: str
     request_id: str
 
 
 class ErrorResponse(Strict):
     error: ErrorBody
+
+
+class ExportCreate(Strict):
+    """Body của POST /exports. Timestamp là chuỗi ISO 8601 UTC 'Z', được kiểm bằng parse_ts như các API đọc."""
+    building_id: str
+    metric: Metric
+    start: str
+    end: str
+
+
+class ExportJob(Strict):
+    export_id: str
+    building_id: str
+    metric: Metric
+    start: datetime
+    end: datetime
+    row_count: int = Field(ge=0)
+    content_sha256: str
+    created_at: datetime
+    download_url: str
+
+
+class ExportResponse(Strict):
+    data: ExportJob
+    meta: MetaBase
