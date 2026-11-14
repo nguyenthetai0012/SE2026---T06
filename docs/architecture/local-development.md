@@ -264,7 +264,7 @@ Only `db` and `mqtt` are currently available in the main QA Compose file. The op
 
 
 
-The remaining application services must be added when their implementations and startup commands are available.
+The remaining application services must be added when their implementations and startup commands are available. When these services are added, their Compose service names will remain consistent with the MVP implementation guide to avoid breaking the local development workflow and documentation.
 
 
 
