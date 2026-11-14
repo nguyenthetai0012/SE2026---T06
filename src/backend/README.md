@@ -12,7 +12,7 @@ Contract: [`mvp-api.md`](../../docs/contracts/mvp-api.md); OpenAPI sinh từ cod
 | PostgreSQL | 16.15 | extension `btree_gist` 1.7 (gói contrib) |
 | Hệ điều hành | Windows 11 | kiểm chứng ngày 2026-11-12: migration, seed, pytest, `export_openapi.py --check` |
 
-Linux/Docker: **chưa xác minh**. Compose/CI là bước 1D.
+Linux: đã chạy lại ngày 2026-11-14 (Python 3.13.18, PostgreSQL 16.15 cài trực tiếp, không Docker): `pytest` và `export_openapi.py --check` đều pass. Docker/Compose/CI: **chưa xác minh** (bước 1D).
 
 ## Chạy
 
