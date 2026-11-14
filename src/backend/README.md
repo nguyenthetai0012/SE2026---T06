@@ -12,7 +12,7 @@ Contract: [`mvp-api.md`](../../docs/contracts/mvp-api.md); OpenAPI sinh từ cod
 | PostgreSQL | 16.15 | extension `btree_gist` 1.7 (gói contrib) |
 | Hệ điều hành | Windows 11 | kiểm chứng ngày 2026-11-12: migration, seed, pytest, `export_openapi.py --check` |
 
-Linux/Docker: **chưa xác minh**. Compose/CI là bước 1D.
+Linux: đã chạy lại ngày 2026-11-14 (Python 3.13.18, PostgreSQL 16.15 cài trực tiếp, không Docker): `pytest` và `export_openapi.py --check` đều pass. Docker/Compose/CI: **chưa xác minh** (bước 1D).
 
 ## Chạy
 
@@ -78,3 +78,31 @@ Test dùng [`mvp-normal.json`](../../docs/testing/fixtures/mvp-normal.json) làm
 - Worker ingestion (validation, idempotency, overlap ở tầng ứng dụng, alert sinh từ MQTT): bước 2B.
 - Dockerfile, Compose, CI: bước 1D (Ngọc). Test mới chạy cục bộ, chưa chạy trên CI.
 - Không có test tải; truy vấn chưa được đo trên dữ liệu lớn. Index theo thiết kế baseline, chưa có `EXPLAIN` trên dữ liệu thật.
+
+## MQTT worker (bước 2B, issue #37)
+
+Mã: `worker/` (`validate.py`, `ingest.py`, `consumer.py`). Theo [`mvp-mqtt.md`](../../docs/contracts/mvp-mqtt.md): topic `campus/v1/+/+/readings`, QoS 1, retained bị từ chối.
+Thứ tự kiểm tra: size/JSON/schema -> topic/registry -> idempotency (duplicate / `MESSAGE_ID_CONFLICT` / `READING_CONFLICT`) -> interval (`INTERVAL_OVERLAP`) -> ghi reading, `last_seen`, `latest_event_time`, alert trong một transaction. Bản bị từ chối không để lại dấu vết trong DB.
+
+```bash
+cd src/backend && pip install -r requirements.txt
+export DATABASE_URL=...  MQTT_HOST=localhost  MQTT_PORT=1883   # MQTT_USERNAME/MQTT_PASSWORD/MQTT_CLIENT_ID tùy chọn
+python -m worker.consumer
+```
+
+Kiểm thử (cùng `TEST_DATABASE_URL` như trên): `pytest` (gồm `tests/integration/backend/test_worker_ingest.py`).
+
+Quyết định triển khai contract chưa nói (cần nhóm xác nhận):
+
+1. Mã lỗi ngoài INVALID_VALUE/MESSAGE_ID_CONFLICT/READING_CONFLICT/INTERVAL_OVERLAP là tên nội bộ (`UNKNOWN_FIELD`, `MISSING_FIELD`, `INVALID_JSON`, `TOPIC_MISMATCH`, `UNKNOWN_DEVICE`, `FUTURE_EVENT_TIME`...).
+2. Lỗi DB: không ACK rồi ngắt kết nối để broker gửi lại (session bền); bản bị từ chối vẫn được ACK.
+3. Device `enabled=false` vẫn nhận và lưu reading (summary đã loại khỏi tổng); contract chưa nói reject.
+4. `value` làm tròn về 9 chữ số thập phân (kiểu `Numeric(24,9)`) trước khi so sánh duplicate.
+5. `alert_id` = UUIDv5 của `alert:<message_id>`; `detected_at` = `received_at`.
+
+Đã chạy với broker thật (2026-11-14, Linux, Mosquitto 2.0.18 cài từ apt, listener localhost, anonymous; PostgreSQL 16.15; chạy tay): publish QoS 1 các ca hợp lệ, duplicate, `MESSAGE_ID_CONFLICT`, `INTERVAL_OVERLAP`, JSON lỗi, `value` kiểu chuỗi, device lạ, topic lệch, late, out-of-order đều cho kết quả đúng; bản gửi lúc worker tắt được nhận sau khi bật lại (session bền); DB dừng giữa chừng thì không ACK, worker nối lại sau 5 giây và broker gửi lại, bản tin được ghi đúng một lần sau khi DB chạy lại.
+Lưu ý: Mosquitto chỉ giữ cờ retain khi gửi bản đã lưu cho subscriber mới (ngay sau subscribe); bản retained gửi tới subscriber đang online có cờ retain=false nên worker không thấy. Worker từ chối `RETAINED_MESSAGE` đúng khi nhận bản retained lúc (re)subscribe.
+
+Test tự động qua broker: `tests/integration/backend/test_worker_live_mqtt.py` (3 test: duplicate/conflict/invalid, gửi khi worker tắt, retained khi subscribe); cần lệnh `mosquitto` trong PATH, thiếu thì bỏ qua có lý do, đặt `REQUIRE_MQTT_BROKER=1` để coi là lỗi. Kịch bản DB dừng giữa chừng mới chạy tay.
+
+Chưa kiểm chứng: load, health endpoint của worker, Docker/Compose, broker có xác thực.
