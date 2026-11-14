@@ -22,7 +22,7 @@ from .params import parse_id, parse_ts, read_query
 from .schemas import ErrorResponse, ExportCreate, ExportResponse
 
 log = logging.getLogger("app.exports")
-IDEMPOTENCY_KEY_RE = re.compile(r"^[A-Za-z0-9._:-]{8,64}$")
+IDEMPOTENCY_KEY_RE = re.compile(r"[A-Za-z0-9._:-]{8,64}")  # fullmatch (AI review #9)
 MAX_RANGE = timedelta(days=31)
 PREFIX = "/api/v1/exports"
 
@@ -66,14 +66,14 @@ def build_export_router(get_db: Callable[[], Iterator[Session]], now: Callable[[
         422: {"model": ErrorResponse, "description": "INVALID_QUERY hoặc EXPORT_TOO_LARGE"}},
         openapi_extra={
             "parameters": [{"name": "Idempotency-Key", "in": "header", "required": True,
-                            "schema": {"type": "string", "pattern": IDEMPOTENCY_KEY_RE.pattern}}],
+                            "schema": {"type": "string", "pattern": f"^{IDEMPOTENCY_KEY_RE.pattern}$"}}],
             "requestBody": {"required": True, "content": {"application/json": {
                 "schema": ExportCreate.model_json_schema()}}}})
     def create(request: Request, response: Response, raw: bytes = Depends(_raw_body), db: Session = Depends(get_db)):
         """Tạo export CSV readings của một building trong [start,end). Retry cùng Idempotency-Key trả lại export cũ."""
         principal = require_export(authenticate(db, request.headers.get("authorization")))
         key = request.headers.get("idempotency-key", "")
-        if not IDEMPOTENCY_KEY_RE.match(key):
+        if not IDEMPOTENCY_KEY_RE.fullmatch(key):
             raise invalid_query("thiếu hoặc sai Idempotency-Key (8-64 ký tự A-Z a-z 0-9 . _ : -)")
         req = _parse_body(raw)
         if req.building_id not in principal.buildings:

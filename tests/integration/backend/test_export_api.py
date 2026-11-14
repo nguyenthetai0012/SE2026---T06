@@ -190,11 +190,48 @@ def test_idempotency_I3_replay_returns_same_export(client, tokens, exp_db):
     assert count_exports(exp_db) == 1
 
 
-def test_idempotency_I4_same_key_different_request_conflicts(client, tokens, exp_db):
-    assert post(client, tokens["ops"], key="key-conflict-01").status_code == 201
-    r = post(client, tokens["ops"], key="key-conflict-01", end="2026-10-27T00:02:00Z")
-    assert r.status_code == 409 and err(r) == "IDEMPOTENCY_CONFLICT"
+@pytest.mark.parametrize("change", [
+    {"end": "2026-10-27T00:02:00Z"}, {"start": "2026-10-27T00:01:00Z"}, {"metric": "energy_kwh"},
+    {"building_id": "BLD-B"},   # client "other" có cả BLD-A và BLD-B trong scope (thêm sau AI review #3)
+])
+def test_idempotency_I4_same_key_different_request_conflicts(client, tokens, exp_db, change):
+    """Mọi trường của body đều phải tham gia request_hash; thiếu một trường thì replay trả nhầm export cũ."""
+    assert post(client, tokens["other"], key="key-conflict-01").status_code == 201
+    r = post(client, tokens["other"], key="key-conflict-01", **change)
+    assert r.status_code == 409 and err(r) == "IDEMPOTENCY_CONFLICT", (change, r.text)
     assert count_exports(exp_db) == 1
+
+
+def test_replay_after_scope_revoked_is_denied(client, tokens, exp_db):
+    """Replay không được bỏ qua kiểm tra scope (thêm sau AI review #3)."""
+    assert post(client, tokens["ops"], key="key-revoke-0001").status_code == 201
+    exp_db.execute(text("DELETE FROM export_client_scopes WHERE client_id='ops'"))
+    exp_db.commit()
+    assert_denied_404(post(client, tokens["ops"], key="key-revoke-0001"))
+
+
+def test_idempotency_guard_holds_when_database_default_is_repeatable_read(database_url, tokens, exp_db, clock):
+    """AI review #6: guard dựa vào READ COMMITTED (lần đọc lại thấy bản ghi của request thắng).
+    Trước khi sửa, với DB mặc định REPEATABLE READ: 9-14/30 request trả 503."""
+    def set_default(value: str):
+        # Phải chạy autocommit: nằm trong transaction chưa commit thì kết nối khác không thấy (test sẽ pass rỗng).
+        with exp_db.get_bind().connect().execution_options(isolation_level="AUTOCOMMIT") as c:
+            c.execute(text(f"ALTER DATABASE energy_test SET default_transaction_isolation = {value}"))
+
+    set_default("'repeatable read'")
+    try:
+        app = create_app(Settings(database_url=database_url), clock=clock)
+        n, barrier = 30, threading.Barrier(30)
+        with TestClient(app, raise_server_exceptions=False) as c:
+            def go(_):
+                barrier.wait()
+                return post(c, tokens["ops"], key="key-rr-000001")
+            with ThreadPoolExecutor(n) as ex:
+                codes = Counter(r.status_code for r in ex.map(go, range(n)))
+        app.state.engine.dispose()
+    finally:
+        set_default("DEFAULT")
+    assert codes == {201: 1, 200: n - 1}, codes
 
 
 def test_idempotency_I5_key_is_scoped_per_client(client, tokens, exp_db):

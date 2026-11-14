@@ -11,7 +11,7 @@ from .export_clients import hash_token
 from .exports import Principal
 from .models import ExportClient, ExportClientScope
 
-TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{20,128}$")
+TOKEN_RE = re.compile(r"[A-Za-z0-9_-]{20,128}")  # dùng fullmatch: "$" của Python nhận cả "\n" cuối
 
 
 def unauthenticated() -> ApiError:
@@ -25,7 +25,7 @@ def forbidden() -> ApiError:
 def authenticate(db: Session, authorization: str | None) -> Principal:
     """Token thiếu, sai định dạng, không tồn tại hoặc client bị tắt đều trả cùng một lỗi 401."""
     scheme, _, token = (authorization or "").partition(" ")
-    if scheme.lower() != "bearer" or not TOKEN_RE.match(token):
+    if scheme.lower() != "bearer" or not TOKEN_RE.fullmatch(token):
         raise unauthenticated()
     row = db.execute(
         select(ExportClient.client_id, ExportClient.can_export, ExportClient.enabled)

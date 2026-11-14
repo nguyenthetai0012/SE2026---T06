@@ -22,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "docs" / "testing" / "bt3-vt023"
 EXPORTS = "src/backend/app/exports.py"
 MODELS = "src/backend/app/models.py"
+EXPORTS_API = "src/backend/app/exports_api.py"
 MIGRATION = "src/backend/alembic/versions/0002_export_api.py"
 CONCURRENT = "../../tests/integration/backend/test_export_api.py::test_idempotency_concurrent_retries_create_exactly_one"
 
@@ -36,6 +37,14 @@ MUTANTS = {
     ]),
     "M3": ("Bỏ UNIQUE ở migration nhưng ORM vẫn khai báo (lệch contract ORM <-> DB)", [
         (MIGRATION, "            CONSTRAINT uq_exports_client_key UNIQUE (client_id, idempotency_key),\n", ""),
+    ]),
+    "M5": ("request_hash bỏ building_id (AI review #3): cùng key, building khác vẫn bị coi là replay", [
+        (EXPORTS, '        canon = {"building_id": self.building_id, "metric": self.metric,\n',
+         '        canon = {"metric": self.metric,\n'),
+    ]),
+    "M6": ("Chỉ kiểm scope khi tạo mới (AI review #3): replay sau khi bị thu hồi scope vẫn trả export", [
+        (EXPORTS_API, "        if req.building_id not in principal.buildings:\n",
+         "        if req.building_id not in principal.buildings and PgExportStore(db).find(principal.client_id, key) is None:\n"),
     ]),
     "M4": ("Replay không so sánh request_hash (cùng key, body khác vẫn trả export cũ)", [
         (EXPORTS, "    if existing.request_hash != want_hash:\n        raise IdempotencyConflict()\n", ""),
