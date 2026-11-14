@@ -1,34 +1,36 @@
 {
-  "base_commit": "a3fdb73",
+  "base_commit": "a2f06cf",
   "mutants": {
     "M1": {
       "description": "Bỏ ON CONFLICT: kiểm-rồi-chèn ở ứng dụng, vẫn giữ UNIQUE ở DB",
       "full_suite": {
-        "failed": 1,
-        "passed": 123
+        "failed": 2,
+        "passed": 127
       },
       "killed_by": [
-        "test_export_api.py::test_idempotency_concurrent_retries_create_exactly_one[30]"
+        "test_export_api.py::test_idempotency_concurrent_retries_create_exactly_one[30]",
+        "test_export_api.py::test_idempotency_guard_holds_when_database_default_is_repeatable_read"
       ],
       "unit_tests_with_fake_store": {
         "passed": 5
       },
       "concurrent_test_kill_rate": "10/10",
       "concurrent_test_observed": [
+        "E       AssertionError: Counter({200: 19, 500: 10, 201: 1})",
         "E       AssertionError: Counter({200: 24, 500: 5, 201: 1})",
-        "E       AssertionError: Counter({200: 21, 500: 8, 201: 1})",
-        "E       AssertionError: Counter({200: 20, 500: 9, 201: 1})"
+        "E       AssertionError: Counter({200: 21, 500: 8, 201: 1})"
       ],
       "status": "KILLED"
     },
     "M2": {
       "description": "Bỏ toàn bộ guard: không ON CONFLICT, không UNIQUE (migration và ORM)",
       "full_suite": {
-        "failed": 2,
-        "passed": 122
+        "failed": 3,
+        "passed": 126
       },
       "killed_by": [
         "test_export_api.py::test_idempotency_concurrent_retries_create_exactly_one[30]",
+        "test_export_api.py::test_idempotency_guard_holds_when_database_default_is_repeatable_read",
         "test_export_schema.py::test_database_enforces_one_export_per_client_and_key"
       ],
       "unit_tests_with_fake_store": {
@@ -36,16 +38,16 @@
       },
       "concurrent_test_kill_rate": "10/10",
       "concurrent_test_observed": [
-        "E       AssertionError: Counter({200: 23, 201: 7})",
-        "E       AssertionError: Counter({201: 15, 200: 15})",
-        "E       AssertionError: Counter({200: 16, 201: 14})"
+        "E       AssertionError: Counter({200: 20, 201: 10})",
+        "E       AssertionError: Counter({200: 22, 201: 8})",
+        "E       AssertionError: Counter({200: 21, 201: 9})"
       ],
       "status": "KILLED"
     },
     "M3": {
       "description": "Bỏ UNIQUE ở migration nhưng ORM vẫn khai báo (lệch contract ORM <-> DB)",
       "full_suite": {
-        "failed": 12,
+        "failed": 17,
         "passed": 106,
         "error": 6
       },
@@ -61,10 +63,15 @@
         "test_export_api.py::test_download_decision_table[D4-None-other-404]",
         "test_export_api.py::test_download_decision_table[D5-DELETE FROM export_client_scopes WHERE client_id='ops'-ops-404]",
         "test_export_api.py::test_idempotency_I3_replay_returns_same_export",
-        "test_export_api.py::test_idempotency_I4_same_key_different_request_conflicts",
+        "test_export_api.py::test_idempotency_I4_same_key_different_request_conflicts[change0]",
+        "test_export_api.py::test_idempotency_I4_same_key_different_request_conflicts[change1]",
+        "test_export_api.py::test_idempotency_I4_same_key_different_request_conflicts[change2]",
+        "test_export_api.py::test_idempotency_I4_same_key_different_request_conflicts[change3]",
         "test_export_api.py::test_idempotency_I5_key_is_scoped_per_client",
         "test_export_api.py::test_idempotency_concurrent_retries_create_exactly_one[30]",
+        "test_export_api.py::test_idempotency_guard_holds_when_database_default_is_repeatable_read",
         "test_export_api.py::test_range_of_exactly_31_days_is_allowed",
+        "test_export_api.py::test_replay_after_scope_revoked_is_denied",
         "test_export_api.py::test_token_never_logged",
         "test_export_schema.py::test_database_enforces_one_export_per_client_and_key",
         "test_export_schema.py::test_orm_models_match_alembic_schema"
@@ -80,14 +87,49 @@
       ],
       "status": "KILLED"
     },
+    "M5": {
+      "description": "request_hash bỏ building_id (AI review #3): cùng key, building khác vẫn bị coi là replay",
+      "full_suite": {
+        "failed": 1,
+        "passed": 128
+      },
+      "killed_by": [
+        "test_export_api.py::test_idempotency_I4_same_key_different_request_conflicts[change3]"
+      ],
+      "unit_tests_with_fake_store": {
+        "passed": 5
+      },
+      "concurrent_test_kill_rate": "0/10",
+      "concurrent_test_observed": [],
+      "status": "KILLED"
+    },
+    "M6": {
+      "description": "Chỉ kiểm scope khi tạo mới (AI review #3): replay sau khi bị thu hồi scope vẫn trả export",
+      "full_suite": {
+        "failed": 1,
+        "passed": 128
+      },
+      "killed_by": [
+        "test_export_api.py::test_replay_after_scope_revoked_is_denied"
+      ],
+      "unit_tests_with_fake_store": {
+        "passed": 5
+      },
+      "concurrent_test_kill_rate": "0/10",
+      "concurrent_test_observed": [],
+      "status": "KILLED"
+    },
     "M4": {
       "description": "Replay không so sánh request_hash (cùng key, body khác vẫn trả export cũ)",
       "full_suite": {
-        "failed": 2,
-        "passed": 122
+        "failed": 5,
+        "passed": 124
       },
       "killed_by": [
-        "test_export_api.py::test_idempotency_I4_same_key_different_request_conflicts",
+        "test_export_api.py::test_idempotency_I4_same_key_different_request_conflicts[change0]",
+        "test_export_api.py::test_idempotency_I4_same_key_different_request_conflicts[change1]",
+        "test_export_api.py::test_idempotency_I4_same_key_different_request_conflicts[change2]",
+        "test_export_api.py::test_idempotency_I4_same_key_different_request_conflicts[change3]",
         "test_export_service.py::test_same_key_different_request_conflicts"
       ],
       "unit_tests_with_fake_store": {
