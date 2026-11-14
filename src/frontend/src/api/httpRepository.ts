@@ -15,7 +15,7 @@ export class HttpDashboardRepository implements DashboardRepository {
   }
 
   getDevices(query: DevicesQuery): Promise<Page<Device>> {
-    return this.get<DeviceDto[]>('/devices', { building_id: query.buildingId }).then(mapDevicePage)
+    return this.get<DeviceDto[]>('/devices', { building_id: query.buildingId, limit: query.limit, cursor: query.cursor }).then(mapDevicePage)
   }
 
   getReadings(query: ReadingsQuery): Promise<Page<Reading>> {
@@ -52,6 +52,7 @@ export class HttpDashboardRepository implements DashboardRepository {
     }
     const response = await this.fetcher(`${this.baseUrl}${path}?${query.toString()}`, {
       headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(10_000),
     })
     const payload: unknown = await response.json().catch(() => null)
     if (!response.ok) {

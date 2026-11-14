@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { DashboardRepository } from '../../api/repository'
 import type { Device } from '../../api/models'
 import { formatDateTime } from '../../api/format'
@@ -15,8 +15,15 @@ const statusText: Record<Device['status'], string> = {
 
 export function DevicesPage({ repository, initialBuildingId }: { repository: DashboardRepository; initialBuildingId?: string }) {
   const [buildingId, setBuildingId] = useState(initialBuildingId ?? '')
-  const load = useCallback(() => repository.getDevices({ buildingId: buildingId || undefined }), [repository, buildingId])
-  const query = useDashboardQuery(`devices:${buildingId}`, load)
+  const filterKey = JSON.stringify([buildingId])
+  const [paging, setPaging] = useState<{ key: string; cursors: (string | null)[] }>({ key: filterKey, cursors: [null] })
+  useEffect(() => { setPaging({ key: filterKey, cursors: [null] }) }, [filterKey])
+  const cursors = paging.key === filterKey ? paging.cursors : [null]
+  const cursor = cursors[cursors.length - 1]
+  const load = useCallback(() => repository.getDevices({ buildingId: buildingId || undefined, cursor }), [repository, buildingId, cursor])
+  const query = useDashboardQuery(`${filterKey}:${cursor ?? ''}`, load)
+  const nextPage = (next: string) => setPaging({ key: filterKey, cursors: [...cursors, next] })
+  const previousPage = () => setPaging({ key: filterKey, cursors: cursors.slice(0, -1) })
 
   return (
     <section aria-labelledby="devices-title">
@@ -36,6 +43,11 @@ export function DevicesPage({ repository, initialBuildingId }: { repository: Das
           </div>
         )}
       </QueryPanel>
+      <nav aria-label="Phân trang" className="toolbar">
+        <button type="button" disabled={cursors.length === 1 || query.loading} onClick={previousPage}>Trang trước</button>
+        <span>Trang {cursors.length}</span>
+        <button type="button" disabled={!query.data?.meta.nextCursor || query.loading || !!query.error} onClick={() => { if (query.data?.meta.nextCursor) nextPage(query.data.meta.nextCursor) }}>Trang tiếp</button>
+      </nav>
     </section>
   )
 }

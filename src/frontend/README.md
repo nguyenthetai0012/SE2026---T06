@@ -36,3 +36,9 @@ npm run build
 `dist/` và `node_modules/` là đầu ra cục bộ, không commit. Không dùng dữ liệu mock để suy ra công thức năng lượng, ngưỡng cảnh báo hoặc chính sách online/offline.
 
 Test đơn vị Vitest tạm đặt tại `src/frontend/src/test/` theo quyết định của Tài trong PR #29; test tích hợp và E2E đặt tại `tests/`. Ngoại lệ này cần được ghi nhận trong quy ước dự án.
+
+## Chạy với API
+
+Tạo `src/frontend/.env.local` (không commit) với `VITE_DATA_MODE=api` và `VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1`, rồi chạy lại Vite. Backend phải cho phép origin của frontend qua CORS hoặc dùng reverse proxy cùng origin. Các biến Vite hiển thị trong trình duyệt; không đặt secret vào đó. Mặc định không cấu hình thì dùng mock.
+
+Danh sách thiết bị, cảnh báo và lịch sử có nút chuyển trang theo cursor. Đổi bộ lọc bắt đầu lại từ trang đầu; thử lại dùng cùng truy vấn. Cursor là live view, không phải snapshot: tải lại từ trang đầu để thấy bản ghi mới chèn trước cursor. Tích hợp với Backend PR #30 vẫn cần được kiểm chứng khi Backend và contract sẵn sàng.

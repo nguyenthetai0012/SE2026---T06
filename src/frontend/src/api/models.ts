@@ -78,6 +78,8 @@ export interface SummaryQuery {
 
 export interface DevicesQuery {
   buildingId?: string
+  cursor?: string | null
+  limit?: number
 }
 
 export interface ReadingsQuery {
