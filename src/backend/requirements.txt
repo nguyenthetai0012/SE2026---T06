@@ -1,0 +1,8 @@
+# Runtime. Đã kiểm chứng trên Python 3.12.10 + PostgreSQL 16.15 (Windows 11); Linux/Docker chưa xác minh (xem README.md).
+fastapi==0.162.0
+starlette==1.10.0
+uvicorn==0.54.0
+pydantic==2.14.2
+SQLAlchemy==2.1.6
+psycopg[binary]==3.3.6
+alembic==1.20.1

@@ -20,6 +20,10 @@ Ví dụ power:
 ```json
 {"schema_version":"1.0","message_id":"00000000-0000-4000-8000-000000000001","building_id":"BLD-A","device_id":"A-01","event_time":"2026-10-27T00:01:00Z","metric":"power_kw","value":12}
 ```
+Payload không hợp lệ (value gửi dạng chuỗi, phải là số hữu hạn không âm); worker reject với mã INVALID_VALUE, không ghi reading/alert và không cập nhật last_seen:
+```json
+{"schema_version":"1.0","message_id":"00000000-0000-4000-8000-000000000003","building_id":"BLD-A","device_id":"A-01","event_time":"2026-10-27T00:01:00Z","metric":"power_kw","value":"12"}
+```
 Ví dụ energy của phút vừa đo:
 ```json
 {"schema_version":"1.0","message_id":"00000000-0000-4000-8000-000000000002","building_id":"BLD-A","device_id":"A-01","interval_start":"2026-10-27T00:00:00Z","event_time":"2026-10-27T00:01:00Z","metric":"energy_kwh","value":0.2}
@@ -33,7 +37,7 @@ Same message_id + nội dung khác = MESSAGE_ID_CONFLICT, không ghi đè.
 Khác ID nhưng trùng (device,metric,event_time) = READING_CONFLICT, không tự cộng.
 Energy interval không chồng lấn các interval đã lưu cho device; giao nhau chỉ tại biên được phép. Overlap = INTERVAL_OVERLAP, reject.
 Invalid/unknown/topic mismatch = reject, không vào history/aggregate/status. Counter lỗi có mã; không publish lỗi vào topic readings.
-Late = received_at-event_time >2*period. Out-of-order = event_time < max đã nhận của cùng device+metric.
+Late = received_at-event_time >2*period. Offline và stale đều dùng ngưỡng >=3*period để có cùng biên thời gian. Out-of-order = event_time < max đã nhận của cùng device+metric.
 Late/out-of-order hợp lệ vẫn lưu; history sort event_time; không thay max bằng thời điểm cũ.
 Khi nhiều lỗi cùng tồn tại, trả/log lỗi đầu theo thứ tự kiểm tra; MQTT không có HTTP error response.
 
@@ -44,16 +48,16 @@ Simulator tạo interval liên tiếp đúng period, trên lưới UTC bắt đ�
 energy = power_kw * duration_seconds / 3600. Dữ liệu thực trong tương lai có thể đo energy trực tiếp; Backend không kiểm tra hai metric phải bằng nhau và không suy energy nếu missing.
 
 Summary(start,end):
-- chọn energy interval có interval_start >= start và event_time <= end;
+- chọn energy interval có interval_start >= start và event_time <= end, chỉ của device đang enabled tại thời điểm truy vấn;
 - cộng value theo device rồi building; không cộng power, không cộng duplicate;
 - không chia tỷ lệ interval cắt biên; trả included_interval_count;
-- coverage_ratio = tổng giây interval được chọn / ((end-start)*số device enabled của building);
+- coverage_ratio = tổng giây interval được chọn / ((end-start)*số device enabled của building); energy_kwh cũng chỉ cộng đúng các interval/device này.
 - coverage = complete khi ratio=1, partial khi 0<ratio<1, none khi 0;
 - energy_kwh=null khi không có interval, khác với 0 kWh đã đo;
 - no enabled devices: ratio=0, coverage=none, energy=null;
 - summary data_stale=true nếu bất kỳ enabled device stale hoặc chưa gửi.
 
-Các interval không chồng nhau nên ratio <=1; thay registry/cấu hình cần dataset mới.
+Các interval không chồng nhau và chỉ đếm một tập device enabled cố định trong một dataset nên ratio <=1; thay registry/cấu hình cần dataset mới.
 UI hiển thị điện năng ghi nhận và mức phủ, không gọi partial là tổng tiêu thụ đầy đủ.
 Lịch sử vẫn lọc event_time theo [start,end); summary có thể tính interval kết thúc đúng end. Đây là hai ngữ nghĩa cố ý khác nhau, cần test biên.
 Sai lệch số thực khi kiểm thử dùng sai số tuyệt đối 1e-9; UI làm tròn 3 chữ số nhưng không sửa giá trị API.
