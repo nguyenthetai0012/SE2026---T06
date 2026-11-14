@@ -100,4 +100,7 @@ Quyết định triển khai contract chưa nói (cần nhóm xác nhận):
 4. `value` làm tròn về 9 chữ số thập phân (kiểu `Numeric(24,9)`) trước khi so sánh duplicate.
 5. `alert_id` = UUIDv5 của `alert:<message_id>`; `detected_at` = `received_at`.
 
-Chưa kiểm chứng: chạy với Mosquitto thật (test hiện gọi trực tiếp `ingest()`/`handle()`), load, health endpoint của worker, Docker/Compose.
+Đã chạy với broker thật (2026-11-14, Linux, Mosquitto 2.0.18 cài từ apt, listener localhost, anonymous; PostgreSQL 16.15; chạy tay, chưa có test tự động): publish QoS 1 các ca hợp lệ, duplicate, `MESSAGE_ID_CONFLICT`, `INTERVAL_OVERLAP`, JSON lỗi, `value` kiểu chuỗi, device lạ, topic lệch, late, out-of-order đều cho kết quả đúng; bản gửi lúc worker tắt được nhận sau khi bật lại (session bền); DB dừng giữa chừng thì không ACK, worker nối lại sau 5 giây và broker gửi lại, bản tin được ghi đúng một lần sau khi DB chạy lại.
+Lưu ý: Mosquitto chỉ giữ cờ retain khi gửi bản đã lưu cho subscriber mới (ngay sau subscribe); bản retained gửi tới subscriber đang online có cờ retain=false nên worker không thấy. Worker từ chối `RETAINED_MESSAGE` đúng khi nhận bản retained lúc (re)subscribe.
+
+Chưa kiểm chứng: test tự động qua broker, load, health endpoint của worker, Docker/Compose, broker có xác thực.

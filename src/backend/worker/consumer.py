@@ -2,8 +2,8 @@
 
     cd src/backend && DATABASE_URL=... MQTT_HOST=... python -m worker.consumer
 
-Quyết định MVP (chờ nhóm xác nhận): ACK thủ công SAU khi commit. Lỗi DB -> không ACK, ngắt kết nối để broker
-gửi lại khi kết nối lại (session bền, client_id cố định); bản gửi lại được chống trùng bằng idempotency.
+Quyết định MVP (chờ nhóm xác nhận): ACK thủ công SAU khi commit. Lỗi DB -> không ACK, ngắt rồi nối lại sau 5 giây để broker
+gửi lại (session bền, client_id cố định); bản gửi lại được chống trùng bằng idempotency.
 Bản tin bị từ chối (invalid/conflict) vẫn được ACK và chỉ đếm theo mã; không publish lỗi vào topic readings.
 Chưa có HTTP health endpoint; trạng thái hiện ghi qua log và bộ đếm `Stats`.
 """
@@ -27,6 +27,7 @@ from .ingest import ingest
 
 log = logging.getLogger("worker")
 SUBSCRIBE_TOPIC = "campus/v1/+/+/readings"
+RETRY_DELAY_SECONDS = 5
 
 
 class Stats:
@@ -83,6 +84,7 @@ def run() -> int:
     engine = make_engine(db_settings.database_url, db_settings.statement_timeout_ms)
     stats = Stats()
     stop = threading.Event()
+    retry = threading.Event()
 
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=cfg["client_id"], protocol=mqtt.MQTTv311,
                          clean_session=False, manual_ack=True)
@@ -105,8 +107,7 @@ def run() -> int:
         if handle(engine, stats, msg.topic, bytes(msg.payload), bool(msg.retain)):
             c.ack(msg.mid, msg.qos)
         else:
-            c.disconnect()          # broker gửi lại các bản chưa ACK khi kết nối lại
-            c.reconnect_delay_set(min_delay=1, max_delay=30)
+            retry.set()             # không ACK; vòng chính ngắt rồi nối lại để broker gửi lại các bản chưa ACK
 
     client.on_connect, client.on_disconnect, client.on_message = on_connect, on_disconnect, on_message
     signal.signal(signal.SIGTERM, lambda *_: stop.set())
@@ -115,11 +116,20 @@ def run() -> int:
     client.loop_start()
     try:
         while not stop.wait(1.0):
-            if not stats.connected and client.is_connected() is False:
+            if retry.is_set():
+                # Ngắt hẳn rồi nối lại từ luồng chính (paho dừng luồng mạng sau disconnect()).
+                client.disconnect()
+                client.loop_stop()
+                if stop.wait(RETRY_DELAY_SECONDS):
+                    break
+                retry.clear()
                 try:
                     client.reconnect()
                 except OSError:
-                    log.warning("chưa kết nối lại được broker")
+                    log.warning("chưa kết nối lại được broker; thử lại")
+                    retry.set()
+                client.loop_start()
+            # Mất kết nối ngoài ý muốn do luồng mạng của paho tự nối lại.
     finally:
         client.loop_stop()
         client.disconnect()
