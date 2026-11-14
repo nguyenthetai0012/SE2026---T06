@@ -1,0 +1,13 @@
+diff --git a/src/backend/app/exports.py b/src/backend/app/exports.py
+index 78ea2ed..263b204 100644
+--- a/src/backend/app/exports.py
++++ b/src/backend/app/exports.py
+@@ -123,8 +123,6 @@ def create_export(store: ExportStore, source: RowSource, principal: Principal, k
+ 
+ 
+ def _replay(existing: StoredExport, want_hash: str) -> StoredExport:
+-    if existing.request_hash != want_hash:
+-        raise IdempotencyConflict()
+     return existing
+ 
+ 

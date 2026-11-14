@@ -1,0 +1,36 @@
+diff --git a/src/backend/alembic/versions/0002_export_api.py b/src/backend/alembic/versions/0002_export_api.py
+index 36450cc..9a605e8 100644
+--- a/src/backend/alembic/versions/0002_export_api.py
++++ b/src/backend/alembic/versions/0002_export_api.py
+@@ -48,7 +48,6 @@ def upgrade() -> None:
+             content_sha256 char(64) NOT NULL,
+             content bytea NOT NULL,
+             created_at timestamptz NOT NULL,
+-            CONSTRAINT uq_exports_client_key UNIQUE (client_id, idempotency_key),
+             CONSTRAINT ck_exports_metric CHECK (metric IN ('power_kw','energy_kwh')),
+             CONSTRAINT ck_exports_range_order CHECK (start_at < end_at),
+             CONSTRAINT ck_exports_range_max_31d CHECK (end_at - start_at <= interval '31 days'),
+diff --git a/src/backend/app/exports.py b/src/backend/app/exports.py
+index 78ea2ed..ee5c495 100644
+--- a/src/backend/app/exports.py
++++ b/src/backend/app/exports.py
+@@ -177,7 +177,6 @@ class PgExportStore:
+                     request_hash=export.request_hash, building_id=export.building_id, metric=export.metric,
+                     start_at=export.start, end_at=export.end, row_count=export.row_count,
+                     content_sha256=export.content_sha256, content=export.content, created_at=export.created_at)
+-            .on_conflict_do_nothing(constraint="uq_exports_client_key")
+             .returning(Export.export_id)
+         )
+         return self.db.execute(stmt).first() is not None
+diff --git a/src/backend/app/models.py b/src/backend/app/models.py
+index 28f96ca..e833546 100644
+--- a/src/backend/app/models.py
++++ b/src/backend/app/models.py
+@@ -130,7 +130,6 @@ class Export(Base):
+     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+     __table_args__ = (
+         # Guard idempotency/concurrency: một export cho mỗi (client, Idempotency-Key).
+-        UniqueConstraint("client_id", "idempotency_key", name="uq_exports_client_key"),
+         CheckConstraint("metric IN ('power_kw','energy_kwh')", name="ck_exports_metric"),
+         CheckConstraint("start_at < end_at", name="ck_exports_range_order"),
+         CheckConstraint("end_at - start_at <= interval '31 days'", name="ck_exports_range_max_31d"),
