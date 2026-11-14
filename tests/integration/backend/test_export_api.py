@@ -55,6 +55,16 @@ def err(r):
     return r.json()["error"]["code"]
 
 
+ROUTER_404 = "đường dẫn không tồn tại"
+
+
+def assert_denied_404(r):
+    """404 phải do logic phân quyền trả về, không phải router (route chưa tồn tại cũng trả 404).
+    Thêm sau lần RED 2: không có kiểm tra này, các rule 404 pass ngay khi endpoint chưa được viết."""
+    assert r.status_code == 404, r.text
+    assert r.json()["error"]["code"] == "NOT_FOUND" and r.json()["error"]["message"] != ROUTER_404, r.text
+
+
 # ---------------------------------------------------------------- DT-C: tạo export
 @pytest.mark.parametrize("rule,who,raw_auth,override,status,code", [
     ("C1", None, None, {}, 401, "UNAUTHENTICATED"),
@@ -74,6 +84,8 @@ def err(r):
 def test_create_decision_table(client, tokens, exp_db, rule, who, raw_auth, override, status, code):
     r = post(client, tokens.get(who), raw_auth=raw_auth, **override)
     assert r.status_code == status, (rule, r.text)
+    if status == 404:
+        assert_denied_404(r)
     if code:
         assert err(r) == code, rule
         assert count_exports(exp_db) == 0, f"{rule}: lỗi không được để lại export"
@@ -82,8 +94,10 @@ def test_create_decision_table(client, tokens, exp_db, rule, who, raw_auth, over
 
 
 def test_out_of_scope_and_missing_building_are_indistinguishable(client, tokens):
-    a = post(client, tokens["ops"], key="key-scope-0001", building_id="BLD-B").json()["error"]
-    b = post(client, tokens["ops"], key="key-scope-0002", building_id="BLD-Z").json()["error"]
+    ra = post(client, tokens["ops"], key="key-scope-0001", building_id="BLD-B")
+    rb = post(client, tokens["ops"], key="key-scope-0002", building_id="BLD-Z")
+    assert_denied_404(ra), assert_denied_404(rb)
+    a, b = ra.json()["error"], rb.json()["error"]
     assert (a["code"], a["message"]) == (b["code"], b["message"])           # không lộ BLD-B có tồn tại
 
 
@@ -143,12 +157,14 @@ def test_download_decision_table(client, tokens, exp_db, created, rule, mutate, 
         exp_db.commit()
     r = client.get(created["download_url"], headers=headers(tokens.get(who)))
     assert r.status_code == status, rule
+    if status == 404:
+        assert_denied_404(r)
     assert "message_id" not in r.text                                           # không rò nội dung CSV
 
 
 @pytest.mark.parametrize("export_id", ["00000000-0000-4000-8000-000000000000", "not-a-uuid", "..%2F..%2Fetc"])
 def test_download_D3_unknown_export(client, tokens, export_id):
-    assert client.get(f"{EXPORTS}/{export_id}", headers=headers(tokens["ops"])).status_code == 404
+    assert_denied_404(client.get(f"{EXPORTS}/{export_id}", headers=headers(tokens["ops"])))
 
 
 # ---------------------------------------------------------------- DT-I: idempotency
@@ -252,7 +268,9 @@ def test_database_down_is_503_and_never_echoes_token():
 def test_token_never_logged(client, tokens, caplog):
     caplog.set_level(logging.DEBUG)
     post(client, tokens["ops"])
-    post(client, tokens["ops"], building_id="BLD-B")
+    post(client, tokens["ops"], key="key-log-000002", building_id="BLD-B")
+    # Đối chứng: đường ghi log audit thật sự đã chạy (nếu không, test pass rỗng như ở RED 2).
+    assert "export created client=ops" in caplog.text and "export denied client=ops" in caplog.text
     assert tokens["ops"] not in caplog.text
 
 
