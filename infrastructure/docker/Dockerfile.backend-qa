@@ -1,0 +1,4 @@
+FROM python:3.12.12-slim
+WORKDIR /work
+COPY run_backend_qa.py /qa/run_backend_qa.py
+ENTRYPOINT ["python", "/qa/run_backend_qa.py"]
