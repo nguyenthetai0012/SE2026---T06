@@ -1,0 +1,18 @@
+# FLAKY 1 — thứ tự ngẫu nhiên (pytest-randomly, cài tạm, không thêm vào requirements)
+seed=1: 124 passed, 1 warning in 6.95s
+seed=42: 124 passed, 1 warning in 6.95s
+seed=2026: 124 passed, 1 warning in 7.27s
+seed=31337: 124 passed, 1 warning in 7.27s
+seed=777: 124 passed, 1 warning in 6.97s
+
+# FLAKY 2 — thời gian/múi giờ hệ thống (TZ của tiến trình test; DB phiên luôn UTC)
+TZ=UTC: 124 passed, 1 warning in 7.09s
+TZ=Asia/Saigon: 124 passed, 1 warning in 6.64s
+TZ=America/Los_Angeles: 124 passed, 1 warning in 6.76s
+TZ=Pacific/Kiritimati: 124 passed, 1 warning in 8.53s
+grep đồng hồ thật trong code export (kỳ vọng: không có):
+  (không có — thời gian lấy từ clock được inject)
+
+# FLAKY 3 — đồng thời: chạy lại test 30 luồng cùng key 50 lần trên code ĐÚNG (không được có báo động giả)
+pass 50/50
+  Xác nhận xáo thứ tự: 3 test đầu tiên seed=1 vs seed=42 khác nhau = True

@@ -1,0 +1,8 @@
+1 export (2880 dòng): fetch+ORM 63 ms, render_csv 11 ms, size 334 KB
+ước tính CPU tuần tự cho 190 lần tạo: 14.0 s  (GIL: 40 luồng threadpool không chạy song song phần Python)
+        1    0.007    0.007    0.042    0.042 /home/claude/se2026---t06/src/backend/app/exports.py:187(fetch)
+        2    0.001    0.001    0.018    0.009 /home/claude/bt3/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:214(chunks)
+     2880    0.006    0.000    0.014    0.000 /home/claude/bt3/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:1075(_instance)
+        1    0.000    0.000    0.007    0.007 /home/claude/bt3/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2406(execute)
+        1    0.000    0.000    0.007    0.007 /home/claude/bt3/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2201(_execute_internal)
+        1    0.000    0.000    0.007    0.007 /home/claude/bt3/venv/lib/python3.12/site-packages/sqlalchemy/orm/context.py:310(orm_execute_statement)

@@ -1,0 +1,17 @@
+# RED 1 — commit 1983729 (chỉ có test, chưa có code). Lệnh:
+# cd src/backend && pytest -c pyproject.toml -p no:cacheprovider -q ../../tests/unit/backend ../../tests/integration/backend/test_export_api.py ../../tests/integration/backend/test_export_schema.py
+      1 ERROR test_export_service.py
+      1 E   ModuleNotFoundError: No module named 'app.exports'
+      1 1 warning, 1 error in 0.14s
+      1 !!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+
+## Integration (cùng commit):
+5 failed, 1 warning, 38 errors in 6.27s
+     41 E           sqlalchemy.exc.ProgrammingError: (psycopg.errors.UndefinedTable) relation "export_clients" does not exist
+     41 E           psycopg.errors.UndefinedTable: relation "export_clients" does not exist
+     41 E           [SQL: TRUNCATE export_clients RESTART IDENTITY CASCADE]
+     41 E           
+      1 E       assert {'export_clie...s', 'exports'} <= {'alerts', 'b...', 'readings'}
+      1 E       assert (404 == 503)
+      1 E       AssertionError: ORM chưa khai báo bảng export
+      1 E        +  where 404 = <Response [404 Not Found]>.status_code

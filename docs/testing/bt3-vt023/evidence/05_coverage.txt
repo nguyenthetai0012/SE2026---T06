@@ -1,0 +1,10 @@
+# COVERAGE — commit 2ea64ee; lệnh: pytest -c pyproject.toml --cov=app --cov-branch
+TOTAL                     912     50    158     12    94%
+124 passed, 1 warning in 13.44s
+app/exports.py         dòng 117/117  nhánh 12/12  100%  thiếu: []
+app/exports_api.py     dòng 77/77  nhánh 12/12  100%  thiếu: []
+app/auth.py            dòng 26/26  nhánh 6/6  100%  thiếu: []
+app/export_clients.py  dòng 26/44  nhánh 3/6  58%  thiếu: [28, 32, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51]
+## Chỉ unit test (store giả) trên app/exports.py:
+app/exports.py     117     16     12      1    85%
+5 passed in 0.83s

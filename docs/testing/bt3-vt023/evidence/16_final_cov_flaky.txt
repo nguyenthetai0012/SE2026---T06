@@ -1,0 +1,24 @@
+# FINAL e1a0ca0 — coverage
+129 passed, 1 warning in 12.45s
+TOTAL dòng 862/912 nhánh 144/158 94%
+app/exports.py         dòng 117/117  nhánh 12/12  100%
+app/exports_api.py     dòng 77/77  nhánh 12/12  100%
+app/auth.py            dòng 26/26  nhánh 6/6  100%
+app/export_clients.py  dòng 26/44  nhánh 3/6  58%
+app/db.py              dòng 5/5  nhánh 0/0  100%
+unit-only:
+app/exports.py     117     16     12      1    85%
+# FINAL — flaky: random order
+seed=1: 129 passed, 1 warning in 8.14s
+seed=42: 129 passed, 1 warning in 7.94s
+seed=2026: 129 passed, 1 warning in 7.91s
+seed=31337: 129 passed, 1 warning in 7.52s
+seed=777: 129 passed, 1 warning in 7.96s
+# FINAL — TZ
+TZ=UTC: 129 passed, 1 warning in 6.85s
+TZ=Asia/Saigon: 129 passed, 1 warning in 7.97s
+TZ=America/Los_Angeles: 129 passed, 1 warning in 7.91s
+TZ=Pacific/Kiritimati: 129 passed, 1 warning in 7.83s
+# FINAL — TC11 lặp 50 lần
+pass 50/50
+db settings left:|0

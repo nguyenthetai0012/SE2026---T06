@@ -1,0 +1,1 @@
+Sau khi DROP ck_exports_range_max_31d trên DB (ORM vẫn khai báo): compare_metadata trả [] -> không phát hiện
