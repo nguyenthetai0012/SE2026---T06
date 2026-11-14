@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 OFFLINE_MULTIPLIER = 3      # offline và data_stale cùng biên: >= 3 * period
 DEFAULT_LIMIT = 100
 MAX_LIMIT = 1000
+EXPORT_MAX_ROWS = 50_000   # đề xuất BT3 VT-023: export lớn hơn trả 422, không lưu gì
 
 
 class ConfigError(RuntimeError):
@@ -19,6 +20,7 @@ class Settings:
     database_url: str
     statement_timeout_ms: int = 8000
     cors_origins: tuple[str, ...] = field(default_factory=tuple)
+    export_max_rows: int = EXPORT_MAX_ROWS
 
     @staticmethod
     def from_env() -> "Settings":

@@ -76,6 +76,8 @@ def test_openapi_matches_contract_and_checked_in_file(client):
     assert paths == {
         "/api/v1/buildings/summary": ["get"], "/api/v1/devices": ["get"],
         "/api/v1/devices/{device_id}/readings": ["get"], "/api/v1/alerts": ["get"], "/api/v1/health/ready": ["get"],
+        # BT3 VT-023: API xuất dữ liệu có phân quyền.
+        "/api/v1/exports": ["post"], "/api/v1/exports/{export_id}": ["get"],
     }
     schemas = spec["components"]["schemas"]
     fields = {k: set(schemas[k]["properties"]) for k in ("BuildingSummary", "Device", "Reading", "Alert")}

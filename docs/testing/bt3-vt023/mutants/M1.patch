@@ -1,0 +1,12 @@
+diff --git a/src/backend/app/exports.py b/src/backend/app/exports.py
+index 78ea2ed..ee5c495 100644
+--- a/src/backend/app/exports.py
++++ b/src/backend/app/exports.py
+@@ -177,7 +177,6 @@ class PgExportStore:
+                     request_hash=export.request_hash, building_id=export.building_id, metric=export.metric,
+                     start_at=export.start, end_at=export.end, row_count=export.row_count,
+                     content_sha256=export.content_sha256, content=export.content, created_at=export.created_at)
+-            .on_conflict_do_nothing(constraint="uq_exports_client_key")
+             .returning(Export.export_id)
+         )
+         return self.db.execute(stmt).first() is not None

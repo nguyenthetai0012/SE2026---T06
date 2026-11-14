@@ -6,6 +6,6 @@ requires-python = ">=3.12"
 
 [tool.pytest.ini_options]
 # Chạy từ src/backend: pytest
-testpaths = ["../../tests/integration/backend"]
+testpaths = ["../../tests/integration/backend", "../../tests/unit/backend"]
 pythonpath = ["."]
 addopts = "-ra"

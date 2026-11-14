@@ -1,0 +1,56 @@
+{
+  "when": "2026-11-14T05:10:45+00:00",
+  "base": "http://127.0.0.1:8800",
+  "machine": {
+    "python": "3.12.3",
+    "cpus": 2,
+    "platform": "Linux-6.18.44-fc-v470-x86_64-with-glibc2.39"
+  },
+  "concurrent_tasks": 200,
+  "requests": 500,
+  "wall_s": 7.632,
+  "p50_s": 1.145,
+  "p95_s": 5.969,
+  "max_s": 6.024,
+  "by_kind": {
+    "create": {
+      "n": 150,
+      "p50_s": 5.879,
+      "p95_s": 5.981,
+      "max_s": 6.024
+    },
+    "replay": {
+      "n": 150,
+      "p50_s": 1.117,
+      "p95_s": 1.208,
+      "max_s": 1.236
+    },
+    "download": {
+      "n": 150,
+      "p50_s": 0.519,
+      "p95_s": 1.059,
+      "max_s": 1.1
+    },
+    "shared": {
+      "n": 40,
+      "p50_s": 5.962,
+      "p95_s": 6.006,
+      "max_s": 6.011
+    },
+    "deny": {
+      "n": 10,
+      "p50_s": 2.929,
+      "p95_s": 5.841,
+      "max_s": 5.841
+    }
+  },
+  "shared_key": {
+    "responses": 40,
+    "distinct_export_ids": 1,
+    "created_201": 1
+  },
+  "exceptions": [],
+  "problems": [],
+  "target_p95_s": 5.0,
+  "pass": false
+}

@@ -1,0 +1,52 @@
+# GREEN — commit afc1c9f, Python 3.12.3, 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+# Lệnh: cd src/backend && TEST_DATABASE_URL=... pytest -c pyproject.toml -p no:cacheprovider -v
+test_export_api.py::test_create_decision_table[C1-None-None-override0-401-UNAUTHENTICATED] PASSED
+test_export_api.py::test_create_decision_table[C1b-None-Basic dXNlcjpwYXNz-override1-401-UNAUTHENTICATED] PASSED
+test_export_api.py::test_create_decision_table[C1c-None-None-override2-401-UNAUTHENTICATED] PASSED
+test_export_api.py::test_create_decision_table[C2-None-Bearer AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-override3-401-UNAUTHENTICATED] PASSED
+test_export_api.py::test_create_decision_table[C3-off-None-override4-401-UNAUTHENTICATED] PASSED
+test_export_api.py::test_create_decision_table[C4-reader-None-override5-403-FORBIDDEN] PASSED
+test_export_api.py::test_create_decision_table[C5-ops-None-override6-404-NOT_FOUND] PASSED
+test_export_api.py::test_create_decision_table[C6-ops-None-override7-404-NOT_FOUND] PASSED
+test_export_api.py::test_create_decision_table[C7-ops-None-override8-422-INVALID_QUERY] PASSED
+test_export_api.py::test_create_decision_table[C7b-ops-None-override9-422-INVALID_QUERY] PASSED
+test_export_api.py::test_create_decision_table[C7c-ops-None-override10-422-INVALID_QUERY] PASSED
+test_export_api.py::test_create_decision_table[C7d-ops-None-override11-422-INVALID_QUERY] PASSED
+test_export_api.py::test_create_decision_table[C8-ops-None-override12-201-None] PASSED
+test_export_api.py::test_out_of_scope_and_missing_building_are_indistinguishable PASSED
+test_export_api.py::test_range_of_exactly_31_days_is_allowed PASSED
+test_export_api.py::test_created_export_contains_only_scoped_rows_matching_oracle PASSED
+test_export_api.py::test_download_D6_owner_gets_exact_bytes PASSED
+test_export_api.py::test_download_decision_table[D1-None-None-401] PASSED
+test_export_api.py::test_download_decision_table[D1b-UPDATE export_clients SET enabled=false WHERE client_id='ops'-ops-401] PASSED
+test_export_api.py::test_download_decision_table[D2-UPDATE export_clients SET can_export=false WHERE client_id='ops'-ops-403] PASSED
+test_export_api.py::test_download_decision_table[D4-None-other-404] PASSED
+test_export_api.py::test_download_decision_table[D5-DELETE FROM export_client_scopes WHERE client_id='ops'-ops-404] PASSED
+test_export_api.py::test_download_D3_unknown_export[00000000-0000-4000-8000-000000000000] PASSED
+test_export_api.py::test_download_D3_unknown_export[not-a-uuid] PASSED
+test_export_api.py::test_download_D3_unknown_export[..%2F..%2Fetc] PASSED
+test_export_api.py::test_idempotency_I1_invalid_key[None] PASSED
+test_export_api.py::test_idempotency_I1_invalid_key[short] PASSED
+test_export_api.py::test_idempotency_I1_invalid_key[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx] PASSED
+test_export_api.py::test_idempotency_I1_invalid_key[bad key with spaces] PASSED
+test_export_api.py::test_idempotency_I3_replay_returns_same_export PASSED
+test_export_api.py::test_idempotency_I4_same_key_different_request_conflicts PASSED
+test_export_api.py::test_idempotency_I5_key_is_scoped_per_client PASSED
+test_export_api.py::test_idempotency_concurrent_retries_create_exactly_one[30] PASSED
+test_export_api.py::test_csv_keeps_database_decimal_and_time_precision PASSED
+test_export_api.py::test_csv_neutralises_formula_like_cells PASSED
+test_export_api.py::test_export_too_large_is_rejected_without_side_effect PASSED
+test_export_api.py::test_database_down_is_503_and_never_echoes_token PASSED
+test_export_api.py::test_token_never_logged PASSED
+test_export_api.py::test_issued_token_is_stored_only_as_hash PASSED
+test_export_schema.py::test_orm_models_match_alembic_schema PASSED
+test_export_schema.py::test_database_enforces_one_export_per_client_and_key PASSED
+test_export_schema.py::test_database_enforces_range[2026-10-27T00:03:00Z-2026-10-27T00:00:00Z-ck_exports_range_order] PASSED
+test_export_schema.py::test_database_enforces_range[2026-10-01T00:00:00Z-2026-11-01T00:00:01Z-ck_exports_range_max_31d] PASSED
+test_export_service.py::test_replay_returns_same_export_without_regenerating PASSED
+test_export_service.py::test_same_key_different_request_conflicts PASSED
+test_export_service.py::test_too_large_stores_nothing PASSED
+test_export_service.py::test_request_hash_ignores_nothing_that_changes_the_result PASSED
+test_export_service.py::test_render_csv_header_decimal_and_formula_guard PASSED
+124 passed, 1 warning in 7.28s
+docs/contracts/mvp-openapi.json matches the app
