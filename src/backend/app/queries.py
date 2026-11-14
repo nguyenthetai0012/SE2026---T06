@@ -169,7 +169,7 @@ def list_alerts(db: Session, building_id: str | None, device_id: str | None, lim
     data = [{
         "alert_id": a.alert_id, "message_id": a.message_id, "device_id": a.device_id, "building_id": b,
         "event_time": a.event_time, "detected_at": a.detected_at, "metric": "power_kw",
-        "value": float(a.value_kw), "threshold": float(a.threshold_kw), "unit": "kW", "description": a.description,
+        "value": float(a.threshold_kw), "threshold": float(a.threshold_kw), "unit": "kW", "description": a.description,
     } for a, b in page]
     nxt = pagination.encode(sig, [page[-1][0].detected_at.isoformat(), page[-1][0].alert_id]) if more else None
     return data, nxt
