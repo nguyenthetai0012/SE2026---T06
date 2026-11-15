@@ -58,7 +58,7 @@ export function App({ repository: suppliedRepository }: { repository?: Dashboard
           {route.page === 'history' && <HistoryPage key={route.deviceId} repository={repository} deviceId={route.deviceId} />}
           {route.page === 'alerts' && <AlertsPage repository={repository} />}
         </main>
-        <footer className="app-footer"><span>APP-05 · Smart Campus Energy Dashboard</span><span>Dữ liệu mô phỏng cho phát triển Frontend</span></footer>
+        <footer className="app-footer"><span>APP-05 · Smart Campus Energy Dashboard</span><span>{mode === 'mock' ? 'Dữ liệu mô phỏng cho phát triển Frontend' : 'Dữ liệu từ API'}</span></footer>
       </div>
     </div>
   )
