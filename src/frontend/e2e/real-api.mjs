@@ -1,12 +1,19 @@
-const { chromium } = require('playwright-core')
-const assert = require('node:assert/strict')
+import { chromium } from 'playwright-core'
+import assert from 'node:assert/strict'
 
 async function main() {
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true, args: ['--no-sandbox'] })
   try {
     const page = await browser.newPage()
     const failures = []
-    page.on('pageerror', (error) => failures.push(error.message))
+    page.on('pageerror', (error) => {
+      failures.push(error.message)
+      console.error('Page error:', error.message)
+    })
+    page.on('console', (message) => {
+      if (message.type() === 'error') console.error('Browser console:', message.text())
+    })
+    page.on('requestfailed', (request) => console.error('Request failed:', request.url(), request.failure()?.errorText))
     await page.goto('http://127.0.0.1:5173/', { waitUntil: 'domcontentloaded' })
     await page.getByTestId('summary-BLD-A').waitFor()
     await page.getByTestId('summary-BLD-B').waitFor()
@@ -25,6 +32,9 @@ async function main() {
     await page.getByText('Không có dữ liệu', { exact: true }).waitFor()
     assert.deepEqual(failures, [])
     process.stdout.write('Chrome loaded API-backed overview, filtered devices, empty history and alerts.\n')
+  } catch (error) {
+    console.error('Browser test failed:', error)
+    throw error
   } finally {
     await browser.close()
   }
