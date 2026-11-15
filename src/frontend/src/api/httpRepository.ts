@@ -50,7 +50,9 @@ export class HttpDashboardRepository implements DashboardRepository {
     for (const [key, value] of Object.entries(values)) {
       if (value !== undefined && value !== null && value !== '') query.set(key, String(value))
     }
-    const response = await this.fetcher(`${this.baseUrl}${path}?${query.toString()}`, {
+    // Call fetch without binding this repository as the browser's receiver.
+    const fetcher = this.fetcher
+    const response = await fetcher(`${this.baseUrl}${path}?${query.toString()}`, {
       headers: { Accept: 'application/json' },
       signal: AbortSignal.timeout(10_000),
     })
