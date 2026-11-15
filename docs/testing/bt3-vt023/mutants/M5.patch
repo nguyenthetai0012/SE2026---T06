@@ -1,0 +1,13 @@
+diff --git a/src/backend/app/exports.py b/src/backend/app/exports.py
+index 78ea2ed..f85c1dc 100644
+--- a/src/backend/app/exports.py
++++ b/src/backend/app/exports.py
+@@ -52,7 +52,7 @@ class ExportRequest:
+     end: datetime
+ 
+     def request_hash(self) -> str:
+-        canon = {"building_id": self.building_id, "metric": self.metric,
++        canon = {"metric": self.metric,
+                  "start": _iso(self.start), "end": _iso(self.end)}
+         return hashlib.sha256(json.dumps(canon, sort_keys=True).encode()).hexdigest()
+ 

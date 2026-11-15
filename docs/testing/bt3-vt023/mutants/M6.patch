@@ -1,0 +1,13 @@
+diff --git a/src/backend/app/exports_api.py b/src/backend/app/exports_api.py
+index a1ecc67..658d86b 100644
+--- a/src/backend/app/exports_api.py
++++ b/src/backend/app/exports_api.py
+@@ -76,7 +76,7 @@ def build_export_router(get_db: Callable[[], Iterator[Session]], now: Callable[[
+         if not IDEMPOTENCY_KEY_RE.fullmatch(key):
+             raise invalid_query("thiếu hoặc sai Idempotency-Key (8-64 ký tự A-Z a-z 0-9 . _ : -)")
+         req = _parse_body(raw)
+-        if req.building_id not in principal.buildings:
++        if req.building_id not in principal.buildings and PgExportStore(db).find(principal.client_id, key) is None:
+             log.info("export denied client=%s reason=scope", principal.client_id)
+             raise export_not_found()
+         try:

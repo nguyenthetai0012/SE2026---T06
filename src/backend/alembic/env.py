@@ -10,7 +10,8 @@ from app.models import Base
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # Không tắt logger đã tồn tại: test chạy Alembic trong cùng tiến trình và cần log của app.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 target_metadata = Base.metadata
 
 

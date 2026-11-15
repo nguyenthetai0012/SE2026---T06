@@ -1,0 +1,12 @@
+diff --git a/src/backend/alembic/versions/0002_export_api.py b/src/backend/alembic/versions/0002_export_api.py
+index 36450cc..9a605e8 100644
+--- a/src/backend/alembic/versions/0002_export_api.py
++++ b/src/backend/alembic/versions/0002_export_api.py
+@@ -48,7 +48,6 @@ def upgrade() -> None:
+             content_sha256 char(64) NOT NULL,
+             content bytea NOT NULL,
+             created_at timestamptz NOT NULL,
+-            CONSTRAINT uq_exports_client_key UNIQUE (client_id, idempotency_key),
+             CONSTRAINT ck_exports_metric CHECK (metric IN ('power_kw','energy_kwh')),
+             CONSTRAINT ck_exports_range_order CHECK (start_at < end_at),
+             CONSTRAINT ck_exports_range_max_31d CHECK (end_at - start_at <= interval '31 days'),

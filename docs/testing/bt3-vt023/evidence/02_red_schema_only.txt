@@ -1,0 +1,60 @@
+# RED 2 — commit d71df1b (đã có schema, CHƯA có endpoint). Lệnh: pytest -c pyproject.toml -q ../../tests/integration/backend/test_export_api.py ../../tests/integration/backend/test_export_schema.py
+25 failed, 12 passed, 1 warning, 6 errors in 2.88s
+## Kết quả ngắn theo từng test (status thực tế):
+ERROR ::test_download_D6_owner_gets_exact_bytes - assert 404 == 201
+ERROR ::test_download_decision_table[D1-None-None-401] - assert 404 == 201
+ERROR ::test_download_decision_table[D1b-UPDATE export_clients SET enabled=false WHERE client_id='ops'-ops-401]
+ERROR ::test_download_decision_table[D2-UPDATE export_clients SET can_export=false WHERE client_id='ops'-ops-403]
+ERROR ::test_download_decision_table[D4-None-other-404] - assert 404 == 201
+ERROR ::test_download_decision_table[D5-DELETE FROM export_client_scopes WHERE client_id='ops'-ops-404]
+FAILED ::test_create_decision_table[C1-None-None-override0-401-UNAUTHENTICATED]
+FAILED ::test_create_decision_table[C1b-None-Basic dXNlcjpwYXNz-override1-401-UNAUTHENTICATED]
+FAILED ::test_create_decision_table[C1c-None-None-override2-401-UNAUTHENTICATED]
+FAILED ::test_create_decision_table[C2-None-Bearer AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-override3-401-UNAUTHENTICATED]
+FAILED ::test_create_decision_table[C3-off-None-override4-401-UNAUTHENTICATED]
+FAILED ::test_create_decision_table[C4-reader-None-override5-403-FORBIDDEN]
+FAILED ::test_create_decision_table[C7-ops-None-override8-422-INVALID_QUERY]
+FAILED ::test_create_decision_table[C7b-ops-None-override9-422-INVALID_QUERY]
+FAILED ::test_create_decision_table[C7c-ops-None-override10-422-INVALID_QUERY]
+FAILED ::test_create_decision_table[C7d-ops-None-override11-422-INVALID_QUERY]
+FAILED ::test_create_decision_table[C8-ops-None-override12-201-None] - Assert...
+FAILED ::test_range_of_exactly_31_days_is_allowed - AssertionError: {"error":...
+FAILED ::test_created_export_contains_only_scoped_rows_matching_oracle - asse...
+FAILED ::test_idempotency_I1_invalid_key[None] - assert (404 == 422)
+FAILED ::test_idempotency_I1_invalid_key[short] - assert (404 == 422)
+FAILED ::test_idempotency_I1_invalid_key[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx]
+FAILED ::test_idempotency_I1_invalid_key[bad key with spaces] - assert (404 =...
+FAILED ::test_idempotency_I3_replay_returns_same_export - assert (404, 404) =...
+FAILED ::test_idempotency_I4_same_key_different_request_conflicts - Assertion...
+FAILED ::test_idempotency_I5_key_is_scoped_per_client - assert (404, 404) == ...
+FAILED ::test_idempotency_concurrent_retries_create_exactly_one[30] - Asserti...
+FAILED ::test_csv_keeps_database_decimal_and_time_precision - KeyError: 'data'
+FAILED ::test_csv_neutralises_formula_like_cells - KeyError: 'data'
+FAILED ::test_export_too_large_is_rejected_without_side_effect - assert (404 ...
+FAILED ::test_database_down_is_503_and_never_echoes_token - assert (404 == 503)
+## Lý do (gom nhóm):
+      9 E       assert 404 == 201
+      5 E       assert 404 == 401
+      5 E       assert (404 == 422)
+      4 E       assert 404 == 422
+      2 E       KeyError: 'data'
+      1 E       assert Counter({404: 30}) == {201: 1, 200: 29}
+      1 E       assert 404 == 403
+      1 E       assert (404, 404) == (201, 201)
+PASSED ::test_create_decision_table[C5-ops-None-override6-404-NOT_FOUND]
+PASSED ::test_create_decision_table[C6-ops-None-override7-404-NOT_FOUND]
+PASSED ::test_out_of_scope_and_missing_building_are_indistinguishable
+PASSED ::test_download_D3_unknown_export[00000000-0000-4000-8000-000000000000]
+PASSED ::test_download_D3_unknown_export[not-a-uuid]
+PASSED ::test_download_D3_unknown_export[..%2F..%2Fetc]
+PASSED ::test_token_never_logged
+PASSED ::test_issued_token_is_stored_only_as_hash
+PASSED ::test_orm_models_match_alembic_schema
+PASSED ::test_database_enforces_one_export_per_client_and_key
+PASSED ::test_database_enforces_range[2026-10-27T00:03:00Z-2026-10-27T00:00:00Z-ck_exports_range_order]
+PASSED ::test_database_enforces_range[2026-10-01T00:00:00Z-2026-11-01T00:00:01Z-ck_exports_range_max_31d]
+
+# RED 2b — sau khi siết 7 test pass rỗng (cùng code d71df1b):
+32 failed, 1 passed, 1 warning, 6 errors in 2.86s
+PASSED còn lại trong test_export_api.py:
+PASSED ::test_issued_token_is_stored_only_as_hash

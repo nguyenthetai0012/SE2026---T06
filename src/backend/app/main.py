@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import queries
+from .exports_api import build_export_router
 from .config import Settings
 from .db import make_engine
 from .errors import ApiError
@@ -41,10 +42,11 @@ HISTORY_Q = ("metric", "start", "end", "limit", "cursor")
 ALERTS_Q = ("building_id", "device_id", "limit", "cursor")
 
 
-def _error(request: Request, status: int, code: str, message: str) -> JSONResponse:
+def _error(request: Request, status: int, code: str, message: str,
+           headers: dict[str, str] | None = None) -> JSONResponse:
     rid = getattr(request.state, "request_id", None) or uuid.uuid4().hex
     return JSONResponse({"error": {"code": code, "message": message, "request_id": rid}}, status_code=status,
-                        headers={"X-Request-ID": rid})
+                        headers={"X-Request-ID": rid, **(headers or {})})
 
 
 def create_app(settings: Settings | None = None, clock: Callable[[], datetime] | None = None) -> FastAPI:
@@ -69,7 +71,7 @@ def create_app(settings: Settings | None = None, clock: Callable[[], datetime] |
 
     @app.exception_handler(ApiError)
     async def _api_error(request: Request, exc: ApiError):
-        return _error(request, exc.status, exc.code, exc.message)
+        return _error(request, exc.status, exc.code, exc.message, exc.headers)
 
     @app.exception_handler(RequestValidationError)
     async def _validation(request: Request, exc: RequestValidationError):
@@ -158,4 +160,5 @@ def create_app(settings: Settings | None = None, clock: Callable[[], datetime] |
         return {"data": {"status": "ready"}, "meta": {"generated_at": now()}}
 
     app.include_router(router)
+    app.include_router(build_export_router(get_db, now, settings, ERR))
     return app

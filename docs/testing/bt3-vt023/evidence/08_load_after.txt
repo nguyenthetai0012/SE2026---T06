@@ -1,0 +1,12 @@
+== workers=1 run 1
+{"requests": 500, "wall_s": 7.632, "p50_s": 1.145, "p95_s": 5.969, "max_s": 6.024, "shared_key": {"responses": 40, "distinct_export_ids": 1, "created_201": 1}, "pass": false}
+== workers=1 run 2
+{"requests": 500, "wall_s": 7.089, "p50_s": 1.078, "p95_s": 5.304, "max_s": 5.341, "shared_key": {"responses": 40, "distinct_export_ids": 1, "created_201": 1}, "pass": false}
+== workers=1 run 3
+{"requests": 500, "wall_s": 7.681, "p50_s": 1.094, "p95_s": 6.069, "max_s": 6.096, "shared_key": {"responses": 40, "distinct_export_ids": 1, "created_201": 1}, "pass": false}
+== workers=2 run 1
+{"requests": 500, "wall_s": 5.792, "p50_s": 0.544, "p95_s": 4.86, "max_s": 4.908, "shared_key": {"responses": 40, "distinct_export_ids": 1, "created_201": 1}, "pass": true}
+== workers=2 run 2
+{"requests": 500, "wall_s": 5.929, "p50_s": 0.485, "p95_s": 5.076, "max_s": 5.106, "shared_key": {"responses": 40, "distinct_export_ids": 1, "created_201": 1}, "pass": false}
+== workers=2 run 3
+{"requests": 500, "wall_s": 5.71, "p50_s": 0.6, "p95_s": 4.85, "max_s": 4.88, "shared_key": {"responses": 40, "distinct_export_ids": 1, "created_201": 1}, "pass": true}

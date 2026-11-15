@@ -1,0 +1,7 @@
+# RED (AI review #6), sau khi sửa test cho ALTER DATABASE có hiệu lực; code a3fdb73 chưa sửa
+E       AssertionError: Counter({200: 15, 503: 14, 201: 1})
+1 failed, 43 deselected, 1 warning in 0.47s
+E       AssertionError: Counter({200: 19, 503: 10, 201: 1})
+1 failed, 43 deselected, 1 warning in 0.45s
+E       AssertionError: Counter({200: 18, 503: 11, 201: 1})
+1 failed, 43 deselected, 1 warning in 0.42s

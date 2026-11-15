@@ -1,0 +1,1630 @@
+diff --git a/src/backend/alembic/env.py b/src/backend/alembic/env.py
+index a222a50..5396cc5 100644
+--- a/src/backend/alembic/env.py
++++ b/src/backend/alembic/env.py
+@@ -10,7 +10,8 @@ from app.models import Base
+ 
+ config = context.config
+ if config.config_file_name is not None:
+-    fileConfig(config.config_file_name)
++    # Không tắt logger đã tồn tại: test chạy Alembic trong cùng tiến trình và cần log của app.
++    fileConfig(config.config_file_name, disable_existing_loggers=False)
+ target_metadata = Base.metadata
+ 
+ 
+diff --git a/src/backend/alembic/versions/0002_export_api.py b/src/backend/alembic/versions/0002_export_api.py
+new file mode 100644
+index 0000000..36450cc
+--- /dev/null
++++ b/src/backend/alembic/versions/0002_export_api.py
+@@ -0,0 +1,62 @@
++"""Export API (BT3 VT-023): export_clients, export_client_scopes, exports
++
++Guard idempotency/concurrency nằm ở DB: UNIQUE(client_id, idempotency_key) + INSERT ... ON CONFLICT trong app.
++
++Revision ID: 0002
++Revises: 0001
++"""
++from alembic import op
++
++revision = "0002"
++down_revision = "0001"
++branch_labels = None
++depends_on = None
++
++ID = "'^[A-Za-z0-9_-]{1,64}$'"
++
++
++def upgrade() -> None:
++    op.execute(f"""
++        CREATE TABLE export_clients (
++            client_id varchar(64) PRIMARY KEY,
++            name varchar(200) NOT NULL,
++            token_sha256 char(64) NOT NULL,
++            can_export boolean NOT NULL DEFAULT false,
++            enabled boolean NOT NULL DEFAULT true,
++            created_at timestamptz NOT NULL DEFAULT now(),
++            CONSTRAINT ck_export_clients_id_format CHECK (client_id ~ {ID}),
++            CONSTRAINT ck_export_clients_token_hex CHECK (token_sha256 ~ '^[0-9a-f]{{64}}$'),
++            CONSTRAINT uq_export_clients_token UNIQUE (token_sha256)
++        )""")
++    op.execute("""
++        CREATE TABLE export_client_scopes (
++            client_id varchar(64) NOT NULL REFERENCES export_clients(client_id) ON DELETE CASCADE,
++            building_id varchar(64) NOT NULL REFERENCES buildings(building_id),
++            PRIMARY KEY (client_id, building_id)
++        )""")
++    op.execute("""
++        CREATE TABLE exports (
++            export_id uuid PRIMARY KEY,
++            client_id varchar(64) NOT NULL REFERENCES export_clients(client_id),
++            idempotency_key varchar(64) NOT NULL,
++            request_hash char(64) NOT NULL,
++            building_id varchar(64) NOT NULL REFERENCES buildings(building_id),
++            metric varchar(16) NOT NULL,
++            start_at timestamptz NOT NULL,
++            end_at timestamptz NOT NULL,
++            row_count integer NOT NULL,
++            content_sha256 char(64) NOT NULL,
++            content bytea NOT NULL,
++            created_at timestamptz NOT NULL,
++            CONSTRAINT uq_exports_client_key UNIQUE (client_id, idempotency_key),
++            CONSTRAINT ck_exports_metric CHECK (metric IN ('power_kw','energy_kwh')),
++            CONSTRAINT ck_exports_range_order CHECK (start_at < end_at),
++            CONSTRAINT ck_exports_range_max_31d CHECK (end_at - start_at <= interval '31 days'),
++            CONSTRAINT ck_exports_row_count_nonneg CHECK (row_count >= 0)
++        )""")
++
++
++def downgrade() -> None:
++    op.execute("DROP TABLE IF EXISTS exports")
++    op.execute("DROP TABLE IF EXISTS export_client_scopes")
++    op.execute("DROP TABLE IF EXISTS export_clients")
+diff --git a/src/backend/app/auth.py b/src/backend/app/auth.py
+new file mode 100644
+index 0000000..f22c814
+--- /dev/null
++++ b/src/backend/app/auth.py
+@@ -0,0 +1,44 @@
++"""Xác thực client xuất dữ liệu bằng bearer token (chỉ cho /exports; các API đọc MVP giữ nguyên không xác thực)."""
++from __future__ import annotations
++
++import re
++
++from sqlalchemy import select
++from sqlalchemy.orm import Session
++
++from .errors import ApiError
++from .export_clients import hash_token
++from .exports import Principal
++from .models import ExportClient, ExportClientScope
++
++TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{20,128}$")
++
++
++def unauthenticated() -> ApiError:
++    return ApiError(401, "UNAUTHENTICATED", "cần bearer token hợp lệ", headers={"WWW-Authenticate": "Bearer"})
++
++
++def forbidden() -> ApiError:
++    return ApiError(403, "FORBIDDEN", "client không có quyền xuất dữ liệu")
++
++
++def authenticate(db: Session, authorization: str | None) -> Principal:
++    """Token thiếu, sai định dạng, không tồn tại hoặc client bị tắt đều trả cùng một lỗi 401."""
++    scheme, _, token = (authorization or "").partition(" ")
++    if scheme.lower() != "bearer" or not TOKEN_RE.match(token):
++        raise unauthenticated()
++    row = db.execute(
++        select(ExportClient.client_id, ExportClient.can_export, ExportClient.enabled)
++        .where(ExportClient.token_sha256 == hash_token(token))
++    ).first()
++    if row is None or not row.enabled:
++        raise unauthenticated()
++    buildings = frozenset(db.scalars(select(ExportClientScope.building_id)
++                                     .where(ExportClientScope.client_id == row.client_id)))
++    return Principal(client_id=row.client_id, can_export=row.can_export, buildings=buildings)
++
++
++def require_export(principal: Principal) -> Principal:
++    if not principal.can_export:
++        raise forbidden()
++    return principal
+diff --git a/src/backend/app/config.py b/src/backend/app/config.py
+index 1523dbb..14dfbf0 100644
+--- a/src/backend/app/config.py
++++ b/src/backend/app/config.py
+@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
+ OFFLINE_MULTIPLIER = 3      # offline và data_stale cùng biên: >= 3 * period
+ DEFAULT_LIMIT = 100
+ MAX_LIMIT = 1000
++EXPORT_MAX_ROWS = 50_000   # đề xuất BT3 VT-023: export lớn hơn trả 422, không lưu gì
+ 
+ 
+ class ConfigError(RuntimeError):
+@@ -19,6 +20,7 @@ class Settings:
+     database_url: str
+     statement_timeout_ms: int = 8000
+     cors_origins: tuple[str, ...] = field(default_factory=tuple)
++    export_max_rows: int = EXPORT_MAX_ROWS
+ 
+     @staticmethod
+     def from_env() -> "Settings":
+diff --git a/src/backend/app/errors.py b/src/backend/app/errors.py
+index 35d4535..ae2a581 100644
+--- a/src/backend/app/errors.py
++++ b/src/backend/app/errors.py
+@@ -3,11 +3,12 @@ from __future__ import annotations
+ 
+ 
+ class ApiError(Exception):
+-    def __init__(self, status: int, code: str, message: str):
++    def __init__(self, status: int, code: str, message: str, headers: dict[str, str] | None = None):
+         super().__init__(message)
+         self.status = status
+         self.code = code
+         self.message = message
++        self.headers = headers or {}
+ 
+ 
+ def invalid_query(message: str) -> ApiError:
+@@ -24,3 +25,19 @@ def invalid_cursor() -> ApiError:
+ 
+ def not_found(message: str) -> ApiError:
+     return ApiError(404, "NOT_FOUND", message)
++
++
++# Cùng một thông điệp cho "không có" và "không được phép" để không lộ building/export nào tồn tại.
++EXPORT_SCOPE_MESSAGE = "không có tài nguyên này trong phạm vi được cấp"
++
++
++def export_not_found() -> ApiError:
++    return ApiError(404, "NOT_FOUND", EXPORT_SCOPE_MESSAGE)
++
++
++def idempotency_conflict() -> ApiError:
++    return ApiError(409, "IDEMPOTENCY_CONFLICT", "Idempotency-Key đã dùng cho một yêu cầu khác")
++
++
++def export_too_large(limit: int) -> ApiError:
++    return ApiError(422, "EXPORT_TOO_LARGE", f"export vượt quá {limit} dòng; thu hẹp khoảng thời gian")
+diff --git a/src/backend/app/export_clients.py b/src/backend/app/export_clients.py
+new file mode 100644
+index 0000000..4242a0d
+--- /dev/null
++++ b/src/backend/app/export_clients.py
+@@ -0,0 +1,61 @@
++"""Cấp token cho client xuất dữ liệu. Token chỉ hiện một lần; DB chỉ giữ SHA-256.
++
++    cd src/backend && DATABASE_URL=... python -m app.export_clients --id ops --name "Ops script" \
++        --building BLD-A --can-export
++"""
++from __future__ import annotations
++
++import argparse
++import hashlib
++import secrets
++import sys
++
++from sqlalchemy import select
++from sqlalchemy.orm import Session
++
++from .config import Settings
++from .db import make_engine
++from .models import Building, ExportClient, ExportClientScope
++from .params import ID_RE
++
++
++def hash_token(token: str) -> str:
++    return hashlib.sha256(token.encode("utf-8")).hexdigest()
++
++
++def issue_client(db: Session, *, client_id: str, name: str, buildings: list[str], can_export: bool) -> str:
++    if not ID_RE.match(client_id):
++        raise ValueError("client_id sai định dạng")
++    known = set(db.scalars(select(Building.building_id).where(Building.building_id.in_(buildings))))
++    missing = sorted(set(buildings) - known)
++    if missing:
++        raise ValueError(f"building không tồn tại: {', '.join(missing)}")
++    token = secrets.token_urlsafe(32)
++    db.add(ExportClient(client_id=client_id, name=name, token_sha256=hash_token(token), can_export=can_export))
++    db.flush()
++    db.add_all(ExportClientScope(client_id=client_id, building_id=b) for b in sorted(set(buildings)))
++    db.commit()
++    return token
++
++
++def main(argv: list[str] | None = None) -> int:
++    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
++    ap.add_argument("--id", required=True)
++    ap.add_argument("--name", required=True)
++    ap.add_argument("--building", action="append", required=True)
++    ap.add_argument("--can-export", action="store_true")
++    a = ap.parse_args(argv)
++    settings = Settings.from_env()
++    with Session(make_engine(settings.database_url, settings.statement_timeout_ms)) as db:
++        try:
++            token = issue_client(db, client_id=a.id, name=a.name, buildings=a.building, can_export=a.can_export)
++        except ValueError as exc:
++            print(f"lỗi: {exc}", file=sys.stderr)
++            return 1
++    # In ra stdout đúng một lần để người vận hành lưu; không ghi log.
++    print(token)
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/src/backend/app/exports.py b/src/backend/app/exports.py
+new file mode 100644
+index 0000000..78ea2ed
+--- /dev/null
++++ b/src/backend/app/exports.py
+@@ -0,0 +1,209 @@
++"""Xuất dữ liệu readings theo building (BT3 VT-023).
++
++Bất biến cần bảo vệ: mỗi (client_id, Idempotency-Key) ứng với ĐÚNG MỘT export, và export chỉ chứa
++readings của building nằm trong scope của client đó. Guard đồng thời nằm ở PostgreSQL
++(UNIQUE uq_exports_client_key + INSERT ... ON CONFLICT DO NOTHING), không nằm ở bộ nhớ ứng dụng.
++"""
++from __future__ import annotations
++
++import csv
++import hashlib
++import io
++import json
++import uuid
++from collections.abc import Callable
++from dataclasses import dataclass
++from datetime import datetime, timezone
++from decimal import Decimal
++from typing import Protocol
++
++from sqlalchemy import select
++from sqlalchemy.dialects.postgresql import insert as pg_insert
++from sqlalchemy.orm import Session
++
++from .models import Device, Export, Reading
++from .params import UNIT
++
++CSV_COLUMNS = ("message_id", "device_id", "building_id", "metric", "event_time", "received_at",
++               "interval_start", "value", "unit", "is_late", "is_out_of_order")
++_FORMULA_PREFIX = ("=", "+", "-", "@", "\t", "\r")
++
++
++class IdempotencyConflict(Exception):
++    """Cùng Idempotency-Key nhưng nội dung request khác."""
++
++
++class ExportTooLarge(Exception):
++    pass
++
++
++@dataclass(frozen=True)
++class Principal:
++    client_id: str
++    can_export: bool
++    buildings: frozenset[str]
++
++
++@dataclass(frozen=True)
++class ExportRequest:
++    building_id: str
++    metric: str
++    start: datetime
++    end: datetime
++
++    def request_hash(self) -> str:
++        canon = {"building_id": self.building_id, "metric": self.metric,
++                 "start": _iso(self.start), "end": _iso(self.end)}
++        return hashlib.sha256(json.dumps(canon, sort_keys=True).encode()).hexdigest()
++
++
++@dataclass(frozen=True)
++class ExportRow:
++    message_id: str
++    device_id: str
++    building_id: str
++    metric: str
++    event_time: datetime
++    received_at: datetime
++    interval_start: datetime | None
++    value: Decimal
++    unit: str
++    is_late: bool
++    is_out_of_order: bool
++
++
++@dataclass(frozen=True)
++class StoredExport:
++    export_id: uuid.UUID
++    client_id: str
++    idempotency_key: str
++    request_hash: str
++    building_id: str
++    metric: str
++    start: datetime
++    end: datetime
++    row_count: int
++    content_sha256: str
++    content: bytes
++    created_at: datetime
++
++
++class ExportStore(Protocol):
++    def find(self, client_id: str, key: str) -> StoredExport | None: ...
++
++    def insert_if_absent(self, export: StoredExport) -> bool: ...
++
++
++RowSource = Callable[[str, str, datetime, datetime, int], list[ExportRow]]
++
++
++def create_export(store: ExportStore, source: RowSource, principal: Principal, key: str, req: ExportRequest,
++                  *, now: datetime, max_rows: int) -> tuple[StoredExport, bool]:
++    """Trả (export, created). created=False khi là replay của cùng key."""
++    want = req.request_hash()
++    existing = store.find(principal.client_id, key)
++    if existing is not None:
++        return _replay(existing, want), False
++    rows = source(req.building_id, req.metric, req.start, req.end, max_rows + 1)
++    if len(rows) > max_rows:
++        raise ExportTooLarge()
++    content = render_csv(rows)
++    export = StoredExport(
++        export_id=uuid.uuid4(), client_id=principal.client_id, idempotency_key=key, request_hash=want,
++        building_id=req.building_id, metric=req.metric, start=req.start, end=req.end, row_count=len(rows),
++        content_sha256=hashlib.sha256(content).hexdigest(), content=content, created_at=now,
++    )
++    if store.insert_if_absent(export):
++        return export, True
++    # Request đồng thời khác cùng key đã thắng: trả đúng export của nó, không tạo bản thứ hai.
++    existing = store.find(principal.client_id, key)
++    if existing is None:  # pragma: no cover - chỉ xảy ra nếu DB vi phạm READ COMMITTED
++        raise RuntimeError("idempotency insert bị chặn nhưng không thấy bản ghi đã có")
++    return _replay(existing, want), False
++
++
++def _replay(existing: StoredExport, want_hash: str) -> StoredExport:
++    if existing.request_hash != want_hash:
++        raise IdempotencyConflict()
++    return existing
++
++
++def _iso(dt: datetime) -> str:
++    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
++
++
++def _decimal(d: Decimal) -> str:
++    s = format(d, "f")
++    return s.rstrip("0").rstrip(".") if "." in s else s
++
++
++def _cell(v: str) -> str:
++    # Chống CSV/formula injection khi mở bằng bảng tính: ID hợp lệ có thể bắt đầu bằng '-'.
++    return "'" + v if v.startswith(_FORMULA_PREFIX) else v
++
++
++def render_csv(rows: list[ExportRow]) -> bytes:
++    buf = io.StringIO()
++    w = csv.writer(buf, lineterminator="\r\n")
++    w.writerow(CSV_COLUMNS)
++    for r in rows:
++        w.writerow([_cell(r.message_id), _cell(r.device_id), _cell(r.building_id), r.metric, _iso(r.event_time),
++                    _iso(r.received_at), _iso(r.interval_start) if r.interval_start else "", _decimal(r.value),
++                    r.unit, "true" if r.is_late else "false", "true" if r.is_out_of_order else "false"])
++    return buf.getvalue().encode("utf-8")
++
++
++# ------------------------------------------------------------------ PostgreSQL
++def _to_stored(e: Export) -> StoredExport:
++    return StoredExport(export_id=e.export_id, client_id=e.client_id, idempotency_key=e.idempotency_key,
++                        request_hash=e.request_hash, building_id=e.building_id, metric=e.metric, start=e.start_at,
++                        end=e.end_at, row_count=e.row_count, content_sha256=e.content_sha256,
++                        content=bytes(e.content), created_at=e.created_at)
++
++
++class PgExportStore:
++    def __init__(self, db: Session):
++        self.db = db
++
++    def find(self, client_id: str, key: str) -> StoredExport | None:
++        e = self.db.scalar(select(Export).where(Export.client_id == client_id, Export.idempotency_key == key)
++                           .execution_options(populate_existing=True))
++        return _to_stored(e) if e is not None else None
++
++    def insert_if_absent(self, export: StoredExport) -> bool:
++        stmt = (
++            pg_insert(Export)
++            .values(export_id=export.export_id, client_id=export.client_id, idempotency_key=export.idempotency_key,
++                    request_hash=export.request_hash, building_id=export.building_id, metric=export.metric,
++                    start_at=export.start, end_at=export.end, row_count=export.row_count,
++                    content_sha256=export.content_sha256, content=export.content, created_at=export.created_at)
++            .on_conflict_do_nothing(constraint="uq_exports_client_key")
++            .returning(Export.export_id)
++        )
++        return self.db.execute(stmt).first() is not None
++
++
++def pg_row_source(db: Session) -> RowSource:
++    def fetch(building_id: str, metric: str, start: datetime, end: datetime, limit: int) -> list[ExportRow]:
++        # Scope áp ngay trong SQL (JOIN devices theo building), không lọc sau ở Python.
++        # Đọc cột trực tiếp (Core), không dựng object ORM: dựng 2880 object tốn ~63 ms CPU/export (đo ở BT3, mục tải).
++        stmt = (
++            select(Reading.message_id, Reading.device_id, Device.building_id, Reading.metric, Reading.event_time,
++                   Reading.received_at, Reading.interval_start, Reading.value, Reading.is_late, Reading.is_out_of_order)
++            .join(Device, Device.device_id == Reading.device_id)
++            .where(Device.building_id == building_id, Reading.metric == metric,
++                   Reading.event_time >= start, Reading.event_time < end)
++            .order_by(Reading.event_time, Reading.message_id)
++            .limit(limit)
++        )
++        return [ExportRow(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], UNIT[r[3]], r[8], r[9])
++                for r in db.execute(stmt)]
++    return fetch
++
++
++def get_owned_export(db: Session, principal: Principal, export_id: uuid.UUID) -> StoredExport | None:
++    """Chỉ client tạo ra export, và building vẫn còn trong scope hiện tại, mới thấy được nó."""
++    e = db.scalar(select(Export).where(Export.export_id == export_id, Export.client_id == principal.client_id))
++    if e is None or e.building_id not in principal.buildings:
++        return None
++    return _to_stored(e)
+diff --git a/src/backend/app/exports_api.py b/src/backend/app/exports_api.py
+new file mode 100644
+index 0000000..9e3b5c9
+--- /dev/null
++++ b/src/backend/app/exports_api.py
+@@ -0,0 +1,118 @@
++"""Route /api/v1/exports (BT3 VT-023). Thứ tự kiểm: xác thực -> quyền -> Idempotency-Key -> body -> scope -> tạo."""
++from __future__ import annotations
++
++import logging
++import re
++import uuid
++from collections.abc import Callable, Iterator
++from datetime import datetime, timedelta
++
++from fastapi import APIRouter, Depends, Request, Response
++from pydantic import ValidationError
++from sqlalchemy.orm import Session
++
++from .auth import authenticate, require_export
++from .config import Settings
++from .errors import export_not_found, export_too_large, idempotency_conflict, invalid_query
++from .exports import (
++    ExportRequest, ExportTooLarge, IdempotencyConflict, PgExportStore, StoredExport, create_export, get_owned_export,
++    pg_row_source,
++)
++from .params import parse_id, parse_ts, read_query
++from .schemas import ErrorResponse, ExportCreate, ExportResponse
++
++log = logging.getLogger("app.exports")
++IDEMPOTENCY_KEY_RE = re.compile(r"^[A-Za-z0-9._:-]{8,64}$")
++MAX_RANGE = timedelta(days=31)
++PREFIX = "/api/v1/exports"
++
++
++async def _raw_body(request: Request) -> bytes:
++    # Đọc body thủ công để xác thực chạy TRƯỚC khi validate body (client chưa xác thực không dò được luật validate).
++    return await request.body()
++
++
++def _parse_body(raw: bytes) -> ExportRequest:
++    try:
++        b = ExportCreate.model_validate_json(raw or b"")
++    except ValidationError:
++        raise invalid_query("body phải là JSON {building_id, metric, start, end}") from None
++    parse_id(b.building_id, "building_id")
++    start, end = parse_ts(b.start, "start"), parse_ts(b.end, "end")
++    if not start < end:
++        raise invalid_query("start must be earlier than end")
++    if end - start > MAX_RANGE:
++        raise invalid_query("khoảng thời gian export tối đa 31 ngày")
++    return ExportRequest(building_id=b.building_id, metric=b.metric, start=start, end=end)
++
++
++def _job(e: StoredExport) -> dict:
++    url = f"{PREFIX}/{e.export_id}"
++    return {"export_id": str(e.export_id), "building_id": e.building_id, "metric": e.metric, "start": e.start,
++            "end": e.end, "row_count": e.row_count, "content_sha256": e.content_sha256,
++            "created_at": e.created_at, "download_url": url}
++
++
++def build_export_router(get_db: Callable[[], Iterator[Session]], now: Callable[[], datetime], settings: Settings,
++                        err: dict) -> APIRouter:
++    router = APIRouter(prefix=PREFIX, tags=["exports"])
++    responses = {401: {"model": ErrorResponse, "description": "UNAUTHENTICATED"},
++                 403: {"model": ErrorResponse, "description": "FORBIDDEN"},
++                 404: {"model": ErrorResponse, "description": "NOT_FOUND (không tồn tại hoặc ngoài scope)"},
++                 503: err[503], 500: err[500]}
++
++    @router.post("", status_code=201, response_model=ExportResponse, responses={
++        **responses, 409: {"model": ErrorResponse, "description": "IDEMPOTENCY_CONFLICT"},
++        422: {"model": ErrorResponse, "description": "INVALID_QUERY hoặc EXPORT_TOO_LARGE"}},
++        openapi_extra={
++            "parameters": [{"name": "Idempotency-Key", "in": "header", "required": True,
++                            "schema": {"type": "string", "pattern": IDEMPOTENCY_KEY_RE.pattern}}],
++            "requestBody": {"required": True, "content": {"application/json": {
++                "schema": ExportCreate.model_json_schema()}}}})
++    def create(request: Request, response: Response, raw: bytes = Depends(_raw_body), db: Session = Depends(get_db)):
++        """Tạo export CSV readings của một building trong [start,end). Retry cùng Idempotency-Key trả lại export cũ."""
++        principal = require_export(authenticate(db, request.headers.get("authorization")))
++        key = request.headers.get("idempotency-key", "")
++        if not IDEMPOTENCY_KEY_RE.match(key):
++            raise invalid_query("thiếu hoặc sai Idempotency-Key (8-64 ký tự A-Z a-z 0-9 . _ : -)")
++        req = _parse_body(raw)
++        if req.building_id not in principal.buildings:
++            log.info("export denied client=%s reason=scope", principal.client_id)
++            raise export_not_found()
++        try:
++            export, created = create_export(PgExportStore(db), pg_row_source(db), principal, key, req,
++                                            now=now(), max_rows=settings.export_max_rows)
++        except IdempotencyConflict:
++            db.rollback()
++            raise idempotency_conflict() from None
++        except ExportTooLarge:
++            db.rollback()
++            raise export_too_large(settings.export_max_rows) from None
++        db.commit()
++        if created:
++            log.info("export created client=%s building=%s rows=%d id=%s", principal.client_id, export.building_id,
++                     export.row_count, export.export_id)
++        else:
++            response.status_code = 200
++            response.headers["Idempotent-Replayed"] = "true"
++        response.headers["Location"] = f"{PREFIX}/{export.export_id}"
++        return {"data": _job(export), "meta": {"generated_at": now()}}
++
++    @router.get("/{export_id:path}", response_class=Response, responses={
++        **responses, 200: {"content": {"text/csv": {}}, "description": "Nội dung CSV đã lưu khi tạo"}})
++    def download(export_id: str, request: Request, db: Session = Depends(get_db)):
++        """Tải CSV. Chỉ client đã tạo export và building còn trong scope; còn lại 404 như không tồn tại."""
++        read_query(request, set())  # như mọi GET khác: query param lạ -> 422 (không lộ gì về scope)
++        principal = require_export(authenticate(db, request.headers.get("authorization")))
++        try:
++            eid = uuid.UUID(export_id)
++        except ValueError:
++            raise export_not_found() from None
++        export = get_owned_export(db, principal, eid)
++        if export is None:
++            raise export_not_found()
++        return Response(export.content, media_type="text/csv; charset=utf-8", headers={
++            "Content-Disposition": f'attachment; filename="export-{export.export_id}.csv"',
++            "Cache-Control": "no-store", "ETag": f'"{export.content_sha256}"', "X-Content-Type-Options": "nosniff"})
++
++    return router
+diff --git a/src/backend/app/main.py b/src/backend/app/main.py
+index 69a7a46..fd9083f 100644
+--- a/src/backend/app/main.py
++++ b/src/backend/app/main.py
+@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
+ from starlette.exceptions import HTTPException as StarletteHTTPException
+ 
+ from . import queries
++from .exports_api import build_export_router
+ from .config import Settings
+ from .db import make_engine
+ from .errors import ApiError
+@@ -41,10 +42,11 @@ HISTORY_Q = ("metric", "start", "end", "limit", "cursor")
+ ALERTS_Q = ("building_id", "device_id", "limit", "cursor")
+ 
+ 
+-def _error(request: Request, status: int, code: str, message: str) -> JSONResponse:
++def _error(request: Request, status: int, code: str, message: str,
++           headers: dict[str, str] | None = None) -> JSONResponse:
+     rid = getattr(request.state, "request_id", None) or uuid.uuid4().hex
+     return JSONResponse({"error": {"code": code, "message": message, "request_id": rid}}, status_code=status,
+-                        headers={"X-Request-ID": rid})
++                        headers={"X-Request-ID": rid, **(headers or {})})
+ 
+ 
+ def create_app(settings: Settings | None = None, clock: Callable[[], datetime] | None = None) -> FastAPI:
+@@ -69,7 +71,7 @@ def create_app(settings: Settings | None = None, clock: Callable[[], datetime] |
+ 
+     @app.exception_handler(ApiError)
+     async def _api_error(request: Request, exc: ApiError):
+-        return _error(request, exc.status, exc.code, exc.message)
++        return _error(request, exc.status, exc.code, exc.message, exc.headers)
+ 
+     @app.exception_handler(RequestValidationError)
+     async def _validation(request: Request, exc: RequestValidationError):
+@@ -158,4 +160,5 @@ def create_app(settings: Settings | None = None, clock: Callable[[], datetime] |
+         return {"data": {"status": "ready"}, "meta": {"generated_at": now()}}
+ 
+     app.include_router(router)
++    app.include_router(build_export_router(get_db, now, settings, ERR))
+     return app
+diff --git a/src/backend/app/models.py b/src/backend/app/models.py
+index 00d4bde..28f96ca 100644
+--- a/src/backend/app/models.py
++++ b/src/backend/app/models.py
+@@ -1,14 +1,15 @@
+ """Mô hình dữ liệu theo docs/architecture/mvp-system.md (đề xuất baseline #27)."""
+ from __future__ import annotations
+ 
++import uuid
+ from datetime import datetime
+ from decimal import Decimal
+ 
+ from sqlalchemy import (
+-    Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, Numeric, String, Text,
++    CHAR, Boolean, CheckConstraint, LargeBinary, DateTime, ForeignKey, Index, Integer, Numeric, String, Text,
+     UniqueConstraint, text,
+ )
+-from sqlalchemy.dialects.postgresql import ExcludeConstraint
++from sqlalchemy.dialects.postgresql import UUID, ExcludeConstraint
+ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+ from sqlalchemy.sql import func
+ 
+@@ -89,3 +90,49 @@ class Alert(Base):
+         CheckConstraint("value_kw > threshold_kw", name="ck_alerts_over_threshold"),
+         Index("ix_alerts_detected", "detected_at", "alert_id"),
+     )
++
++
++class ExportClient(Base):
++    """Client máy (CLI/script) được cấp token để xuất dữ liệu. Không phải tài khoản người dùng Dashboard."""
++    __tablename__ = "export_clients"
++    client_id: Mapped[str] = mapped_column(String(64), primary_key=True)
++    name: Mapped[str] = mapped_column(String(200), nullable=False)
++    token_sha256: Mapped[str] = mapped_column(CHAR(64), nullable=False)
++    can_export: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
++    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
++    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
++    __table_args__ = (
++        CheckConstraint(f"client_id ~ '{ID_REGEX}'", name="ck_export_clients_id_format"),
++        CheckConstraint("token_sha256 ~ '^[0-9a-f]{64}$'", name="ck_export_clients_token_hex"),
++        UniqueConstraint("token_sha256", name="uq_export_clients_token"),
++    )
++
++
++class ExportClientScope(Base):
++    __tablename__ = "export_client_scopes"
++    client_id: Mapped[str] = mapped_column(ForeignKey("export_clients.client_id", ondelete="CASCADE"), primary_key=True)
++    building_id: Mapped[str] = mapped_column(ForeignKey("buildings.building_id"), primary_key=True)
++
++
++class Export(Base):
++    __tablename__ = "exports"
++    export_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
++    client_id: Mapped[str] = mapped_column(ForeignKey("export_clients.client_id"), nullable=False)
++    idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
++    request_hash: Mapped[str] = mapped_column(CHAR(64), nullable=False)
++    building_id: Mapped[str] = mapped_column(ForeignKey("buildings.building_id"), nullable=False)
++    metric: Mapped[str] = mapped_column(String(16), nullable=False)
++    start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
++    end_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
++    row_count: Mapped[int] = mapped_column(Integer, nullable=False)
++    content_sha256: Mapped[str] = mapped_column(CHAR(64), nullable=False)
++    content: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
++    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
++    __table_args__ = (
++        # Guard idempotency/concurrency: một export cho mỗi (client, Idempotency-Key).
++        UniqueConstraint("client_id", "idempotency_key", name="uq_exports_client_key"),
++        CheckConstraint("metric IN ('power_kw','energy_kwh')", name="ck_exports_metric"),
++        CheckConstraint("start_at < end_at", name="ck_exports_range_order"),
++        CheckConstraint("end_at - start_at <= interval '31 days'", name="ck_exports_range_max_31d"),
++        CheckConstraint("row_count >= 0", name="ck_exports_row_count_nonneg"),
++    )
+diff --git a/src/backend/app/schemas.py b/src/backend/app/schemas.py
+index 8e90b20..b2f6025 100644
+--- a/src/backend/app/schemas.py
++++ b/src/backend/app/schemas.py
+@@ -126,10 +126,36 @@ class ReadyResponse(Strict):
+ 
+ 
+ class ErrorBody(Strict):
+-    code: Literal["INVALID_QUERY", "FILTER_MISMATCH", "INVALID_CURSOR", "NOT_FOUND", "DEPENDENCY_UNAVAILABLE", "INTERNAL_ERROR"]
++    code: Literal["INVALID_QUERY", "FILTER_MISMATCH", "INVALID_CURSOR", "NOT_FOUND", "DEPENDENCY_UNAVAILABLE", "INTERNAL_ERROR",
++                  "UNAUTHENTICATED", "FORBIDDEN", "IDEMPOTENCY_CONFLICT", "EXPORT_TOO_LARGE"]
+     message: str
+     request_id: str
+ 
+ 
+ class ErrorResponse(Strict):
+     error: ErrorBody
++
++
++class ExportCreate(Strict):
++    """Body của POST /exports. Timestamp là chuỗi ISO 8601 UTC 'Z', được kiểm bằng parse_ts như các API đọc."""
++    building_id: str
++    metric: Metric
++    start: str
++    end: str
++
++
++class ExportJob(Strict):
++    export_id: str
++    building_id: str
++    metric: Metric
++    start: datetime
++    end: datetime
++    row_count: int = Field(ge=0)
++    content_sha256: str
++    created_at: datetime
++    download_url: str
++
++
++class ExportResponse(Strict):
++    data: ExportJob
++    meta: MetaBase
+diff --git a/src/backend/pyproject.toml b/src/backend/pyproject.toml
+index c3fa9cf..94b5207 100644
+--- a/src/backend/pyproject.toml
++++ b/src/backend/pyproject.toml
+@@ -6,6 +6,6 @@ requires-python = ">=3.12"
+ 
+ [tool.pytest.ini_options]
+ # Chạy từ src/backend: pytest
+-testpaths = ["../../tests/integration/backend"]
++testpaths = ["../../tests/integration/backend", "../../tests/unit/backend"]
+ pythonpath = ["."]
+ addopts = "-ra"
+diff --git a/tests/integration/backend/export_helpers.py b/tests/integration/backend/export_helpers.py
+new file mode 100644
+index 0000000..f4e0d6d
+--- /dev/null
++++ b/tests/integration/backend/export_helpers.py
+@@ -0,0 +1,77 @@
++"""Helper cho test export (BT3 VT-023). Ghi trực tiếp bằng SQL để test không phụ thuộc code đang được kiểm.
++
++Hợp đồng lưu trữ được kiểm ở đây: token chỉ lưu dạng SHA-256 hex, không lưu bản rõ.
++"""
++from __future__ import annotations
++
++import csv
++import hashlib
++import io
++import json
++import secrets
++from pathlib import Path
++
++from sqlalchemy import text
++
++ROOT = Path(__file__).resolve().parents[3]
++FIXTURE = ROOT / "docs" / "testing" / "fixtures" / "mvp-normal.json"
++REGISTRY = ROOT / "src" / "backend" / "seed" / "registry.json"
++
++EXPORTS = "/api/v1/exports"
++START, END = "2026-10-27T00:00:00Z", "2026-10-27T00:03:00Z"
++CSV_HEADER = ["message_id", "device_id", "building_id", "metric", "event_time", "received_at",
++              "interval_start", "value", "unit", "is_late", "is_out_of_order"]
++
++
++def make_client(db, client_id: str, buildings: list[str], *, can_export: bool = True, enabled: bool = True) -> str:
++    token = secrets.token_urlsafe(32)
++    db.execute(text("INSERT INTO export_clients (client_id, name, token_sha256, can_export, enabled) "
++                    "VALUES (:i, :n, :h, :c, :e)"),
++               {"i": client_id, "n": f"test {client_id}", "h": hashlib.sha256(token.encode()).hexdigest(),
++                "c": can_export, "e": enabled})
++    for b in buildings:
++        db.execute(text("INSERT INTO export_client_scopes (client_id, building_id) VALUES (:i, :b)"),
++                   {"i": client_id, "b": b})
++    db.commit()
++    return token
++
++
++def headers(token: str | None = None, key: str | None = None, raw_auth: str | None = None) -> dict:
++    h = {}
++    if raw_auth is not None:
++        h["Authorization"] = raw_auth
++    elif token is not None:
++        h["Authorization"] = f"Bearer {token}"
++    if key is not None:
++        h["Idempotency-Key"] = key
++    return h
++
++
++def body(**override) -> dict:
++    return {"building_id": "BLD-A", "metric": "power_kw", "start": START, "end": END} | override
++
++
++def post(client, token=None, key="key-0000-0001", raw_auth=None, **override):
++    return client.post(EXPORTS, json=body(**override), headers=headers(token, key, raw_auth))
++
++
++def parse_csv(content: bytes) -> list[list[str]]:
++    return list(csv.reader(io.StringIO(content.decode("utf-8"))))
++
++
++def count_exports(db) -> int:
++    return db.execute(text("SELECT count(*) FROM exports")).scalar()
++
++
++def oracle_rows(building_id: str, metric: str, start: str, end: str) -> list[list[str]]:
++    """Kết quả mong đợi tính độc lập từ fixture JSON + registry (không đọc từ DB/app)."""
++    reg = {d["device_id"]: d["building_id"] for d in json.loads(REGISTRY.read_text("utf-8"))["devices"]}
++    fx = json.loads(FIXTURE.read_text("utf-8"))
++    out = []
++    for m in fx["messages"]:
++        p = m["payload"]
++        if reg[p["device_id"]] == building_id and p["metric"] == metric and start <= p["event_time"] < end:
++            out.append([p["message_id"], p["device_id"], building_id, metric, p["event_time"], m["received_at"],
++                        p.get("interval_start") or "", str(p["value"]), "kW" if metric == "power_kw" else "kWh",
++                        "false", "false"])
++    return sorted(out, key=lambda r: (r[4], r[0]))
+diff --git a/tests/integration/backend/test_export_api.py b/tests/integration/backend/test_export_api.py
+new file mode 100644
+index 0000000..f2ece0b
+--- /dev/null
++++ b/tests/integration/backend/test_export_api.py
+@@ -0,0 +1,284 @@
++"""BT3 VT-023: API xuất dữ liệu có phân quyền và giới hạn phạm vi.
++
++Kỹ thuật thiết kế test: decision table. Mỗi bảng ghi điều kiện -> hành động; mỗi cột (rule) là một test.
++Chạy trên PostgreSQL thật dựng bằng Alembic (risk: mock che giấu contract sai với database).
++
++Bảng DT-C (POST /exports). Điều kiện kiểm theo thứ tự; "-" = không quan tâm.
++| Rule | Token hợp lệ | Client enabled | can_export | Building trong scope | Building tồn tại | Body/range hợp lệ | Kết quả |
++| C1   | thiếu        | -              | -          | -                    | -                | -                 | 401     |
++| C2   | sai/lạ       | -              | -          | -                    | -                | -                 | 401     |
++| C3   | đúng         | không          | -          | -                    | -                | -                 | 401     |
++| C4   | đúng         | có             | không      | có                   | có               | có                | 403     |
++| C5   | đúng         | có             | có         | không                | có               | có                | 404     |
++| C6   | đúng         | có             | có         | không                | không            | có                | 404     |
++| C7   | đúng         | có             | có         | có                   | có               | không             | 422     |
++| C8   | đúng         | có             | có         | có                   | có               | có                | 201     |
++"""
++from __future__ import annotations
++
++import logging
++import threading
++from collections import Counter
++from concurrent.futures import ThreadPoolExecutor
++
++import pytest
++from export_helpers import (
++    CSV_HEADER, END, EXPORTS, START, count_exports, headers, make_client, oracle_rows, parse_csv, post,
++)
++from fastapi.testclient import TestClient
++from loader import add_reading, load_fixture
++from sqlalchemy import text
++
++from app.config import Settings
++from app.main import create_app
++
++
++@pytest.fixture()
++def exp_db(db):
++    db.execute(text("TRUNCATE export_clients RESTART IDENTITY CASCADE"))
++    db.commit()
++    return db
++
++
++@pytest.fixture()
++def tokens(exp_db, fixture_data):
++    load_fixture(exp_db, fixture_data)
++    return {
++        "ops": make_client(exp_db, "ops", ["BLD-A"]),
++        "reader": make_client(exp_db, "reader", ["BLD-A"], can_export=False),
++        "off": make_client(exp_db, "off", ["BLD-A"], enabled=False),
++        "other": make_client(exp_db, "other", ["BLD-A", "BLD-B"]),
++    }
++
++
++def err(r):
++    return r.json()["error"]["code"]
++
++
++ROUTER_404 = "đường dẫn không tồn tại"
++
++
++def assert_denied_404(r):
++    """404 phải do logic phân quyền trả về, không phải router (route chưa tồn tại cũng trả 404).
++    Thêm sau lần RED 2: không có kiểm tra này, các rule 404 pass ngay khi endpoint chưa được viết."""
++    assert r.status_code == 404, r.text
++    assert r.json()["error"]["code"] == "NOT_FOUND" and r.json()["error"]["message"] != ROUTER_404, r.text
++
++
++# ---------------------------------------------------------------- DT-C: tạo export
++@pytest.mark.parametrize("rule,who,raw_auth,override,status,code", [
++    ("C1", None, None, {}, 401, "UNAUTHENTICATED"),
++    ("C1b", None, "Basic dXNlcjpwYXNz", {}, 401, "UNAUTHENTICATED"),
++    ("C1c", None, None, {"start": "not-a-time"}, 401, "UNAUTHENTICATED"),        # chưa xác thực thì không validate body
++    ("C2", None, "Bearer AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", {}, 401, "UNAUTHENTICATED"),
++    ("C3", "off", None, {}, 401, "UNAUTHENTICATED"),
++    ("C4", "reader", None, {}, 403, "FORBIDDEN"),
++    ("C5", "ops", None, {"building_id": "BLD-B"}, 404, "NOT_FOUND"),
++    ("C6", "ops", None, {"building_id": "BLD-Z"}, 404, "NOT_FOUND"),
++    ("C7", "ops", None, {"start": END, "end": START}, 422, "INVALID_QUERY"),
++    ("C7b", "ops", None, {"start": "2026-10-01T00:00:00Z", "end": "2026-11-01T00:00:01Z"}, 422, "INVALID_QUERY"),
++    ("C7c", "ops", None, {"metric": "voltage"}, 422, "INVALID_QUERY"),
++    ("C7d", "ops", None, {"extra": "x"}, 422, "INVALID_QUERY"),
++    ("C8", "ops", None, {}, 201, None),
++])
++def test_create_decision_table(client, tokens, exp_db, rule, who, raw_auth, override, status, code):
++    r = post(client, tokens.get(who), raw_auth=raw_auth, **override)
++    assert r.status_code == status, (rule, r.text)
++    if status == 404:
++        assert_denied_404(r)
++    if code:
++        assert err(r) == code, rule
++        assert count_exports(exp_db) == 0, f"{rule}: lỗi không được để lại export"
++    if status == 401:
++        assert r.headers["WWW-Authenticate"] == "Bearer"
++
++
++def test_out_of_scope_and_missing_building_are_indistinguishable(client, tokens):
++    ra = post(client, tokens["ops"], key="key-scope-0001", building_id="BLD-B")
++    rb = post(client, tokens["ops"], key="key-scope-0002", building_id="BLD-Z")
++    assert_denied_404(ra), assert_denied_404(rb)
++    a, b = ra.json()["error"], rb.json()["error"]
++    assert (a["code"], a["message"]) == (b["code"], b["message"])           # không lộ BLD-B có tồn tại
++
++
++def test_range_of_exactly_31_days_is_allowed(client, tokens):
++    r = post(client, tokens["ops"], start="2026-10-01T00:00:00Z", end="2026-11-01T00:00:00Z")
++    assert r.status_code == 201, r.text
++
++
++def test_created_export_contains_only_scoped_rows_matching_oracle(client, tokens, exp_db):
++    r = post(client, tokens["ops"])
++    assert r.status_code == 201
++    job = r.json()["data"]
++    assert r.headers["Location"] == f"{EXPORTS}/{job['export_id']}" == job["download_url"]
++    expected = oracle_rows("BLD-A", "power_kw", START, END)
++    assert job["row_count"] == len(expected) == 4
++    rows = parse_csv(client.get(job["download_url"], headers=headers(tokens["ops"])).content)
++    assert rows[0] == CSV_HEADER and rows[1:] == expected
++    assert {row[2] for row in rows[1:]} == {"BLD-A"}                         # không có BLD-B
++
++
++# ---------------------------------------------------------------- DT-D: tải export
++# | Rule | Token hợp lệ+enabled | can_export | Export tồn tại | Của chính client | Building còn trong scope | Kết quả |
++# | D1   | không                | -          | -              | -                | -                        | 401     |
++# | D2   | có                   | không      | -              | -                | -                        | 403     |
++# | D3   | có                   | có         | không          | -                | -                        | 404     |
++# | D4   | có                   | có         | có             | không            | có                       | 404     |
++# | D5   | có                   | có         | có             | có               | không                    | 404     |
++# | D6   | có                   | có         | có             | có               | có                       | 200     |
++@pytest.fixture()
++def created(client, tokens):
++    r = post(client, tokens["ops"])
++    assert r.status_code == 201
++    return r.json()["data"]
++
++
++def test_download_D6_owner_gets_exact_bytes(client, tokens, created):
++    r = client.get(created["download_url"], headers=headers(tokens["ops"]))
++    assert r.status_code == 200
++    assert r.headers["content-type"] == "text/csv; charset=utf-8"
++    assert r.headers["cache-control"] == "no-store"
++    assert r.headers["etag"] == f'"{created["content_sha256"]}"'
++    assert "attachment" in r.headers["content-disposition"]
++    import hashlib
++    assert hashlib.sha256(r.content).hexdigest() == created["content_sha256"]
++
++
++@pytest.mark.parametrize("rule,mutate,who,status", [
++    ("D1", None, None, 401),
++    ("D1b", "UPDATE export_clients SET enabled=false WHERE client_id='ops'", "ops", 401),
++    ("D2", "UPDATE export_clients SET can_export=false WHERE client_id='ops'", "ops", 403),
++    ("D4", None, "other", 404),                                                 # BOLA: client khác cùng scope
++    ("D5", "DELETE FROM export_client_scopes WHERE client_id='ops'", "ops", 404),  # bị thu hồi scope sau khi tạo
++])
++def test_download_decision_table(client, tokens, exp_db, created, rule, mutate, who, status):
++    if mutate:
++        exp_db.execute(text(mutate))
++        exp_db.commit()
++    r = client.get(created["download_url"], headers=headers(tokens.get(who)))
++    assert r.status_code == status, rule
++    if status == 404:
++        assert_denied_404(r)
++    assert "message_id" not in r.text                                           # không rò nội dung CSV
++
++
++@pytest.mark.parametrize("export_id", ["00000000-0000-4000-8000-000000000000", "not-a-uuid", "..%2F..%2Fetc"])
++def test_download_D3_unknown_export(client, tokens, export_id):
++    assert_denied_404(client.get(f"{EXPORTS}/{export_id}", headers=headers(tokens["ops"])))
++
++
++# ---------------------------------------------------------------- DT-I: idempotency
++# | Rule | Key hợp lệ | Key đã có (cùng client) | Cùng request | Kết quả                       |
++# | I1   | không      | -                       | -            | 422, không tạo                 |
++# | I2   | có         | không                   | -            | 201, tạo 1                     |
++# | I3   | có         | có                      | có           | 200 replay, cùng export_id     |
++# | I4   | có         | có                      | không        | 409 IDEMPOTENCY_CONFLICT       |
++# | I5   | có         | có (client khác)        | -            | 201 độc lập                    |
++@pytest.mark.parametrize("key", [None, "short", "x" * 65, "bad key with spaces"])
++def test_idempotency_I1_invalid_key(client, tokens, exp_db, key):
++    r = post(client, tokens["ops"], key=key)
++    assert r.status_code == 422 and err(r) == "INVALID_QUERY"
++    assert count_exports(exp_db) == 0
++
++
++def test_idempotency_I3_replay_returns_same_export(client, tokens, exp_db):
++    first = post(client, tokens["ops"], key="key-replay-0001")
++    second = post(client, tokens["ops"], key="key-replay-0001")
++    assert (first.status_code, second.status_code) == (201, 200)
++    assert second.headers["Idempotent-Replayed"] == "true"
++    assert second.json()["data"] == first.json()["data"]
++    assert count_exports(exp_db) == 1
++
++
++def test_idempotency_I4_same_key_different_request_conflicts(client, tokens, exp_db):
++    assert post(client, tokens["ops"], key="key-conflict-01").status_code == 201
++    r = post(client, tokens["ops"], key="key-conflict-01", end="2026-10-27T00:02:00Z")
++    assert r.status_code == 409 and err(r) == "IDEMPOTENCY_CONFLICT"
++    assert count_exports(exp_db) == 1
++
++
++def test_idempotency_I5_key_is_scoped_per_client(client, tokens, exp_db):
++    a = post(client, tokens["ops"], key="key-shared-0001")
++    b = post(client, tokens["other"], key="key-shared-0001")
++    assert (a.status_code, b.status_code) == (201, 201)
++    assert a.json()["data"]["export_id"] != b.json()["data"]["export_id"]
++
++
++@pytest.mark.parametrize("n", [30])
++def test_idempotency_concurrent_retries_create_exactly_one(client, tokens, exp_db, n):
++    """Failure path gắn với risk: client retry đồng thời. Chỉ DB thật mới chứng minh được guard."""
++    barrier = threading.Barrier(n)
++
++    def go(_):
++        barrier.wait()
++        return post(client, tokens["ops"], key="key-concurrent-01")
++
++    with ThreadPoolExecutor(n) as ex:
++        rs = list(ex.map(go, range(n)))
++    codes = Counter(r.status_code for r in rs)
++    assert codes == {201: 1, 200: n - 1}, codes
++    assert len({r.json()["data"]["export_id"] for r in rs}) == 1
++    assert count_exports(exp_db) == 1
++
++
++# ---------------------------------------------------------------- contract với DB thật / failure path
++def test_csv_keeps_database_decimal_and_time_precision(client, exp_db):
++    token = make_client(exp_db, "ops", ["BLD-A"])
++    add_reading(exp_db, message_id="00000000-0000-4000-8000-00000000e001", device_id="A-01", metric="power_kw",
++                event_time="2026-10-27T00:00:30.500000Z", received_at="2026-10-27T00:00:31Z", value="0.000000001")
++    add_reading(exp_db, message_id="00000000-0000-4000-8000-00000000e002", device_id="A-02", metric="power_kw",
++                event_time="2026-10-27T00:00:40Z", received_at="2026-10-27T00:00:41Z", value="123456789012345.123456789")
++    exp_db.commit()
++    job = post(client, token).json()["data"]
++    rows = parse_csv(client.get(job["download_url"], headers=headers(token)).content)
++    assert [(r[4], r[7]) for r in rows[1:]] == [("2026-10-27T00:00:30.500000Z", "0.000000001"),
++                                                ("2026-10-27T00:00:40Z", "123456789012345.123456789")]
++
++
++def test_csv_neutralises_formula_like_cells(client, exp_db):
++    token = make_client(exp_db, "ops", ["BLD-A"])
++    exp_db.execute(text("INSERT INTO devices (device_id, building_id, name, period_seconds, power_threshold_kw) "
++                        "VALUES ('-A1', 'BLD-A', 'meter', 60, 10)"))
++    add_reading(exp_db, message_id="00000000-0000-4000-8000-00000000e003", device_id="-A1", metric="power_kw",
++                event_time="2026-10-27T00:00:10Z", received_at="2026-10-27T00:00:11Z", value=1)
++    exp_db.commit()
++    job = post(client, token).json()["data"]
++    rows = parse_csv(client.get(job["download_url"], headers=headers(token)).content)
++    assert rows[1][1] == "'-A1"
++
++
++def test_export_too_large_is_rejected_without_side_effect(database_url, tokens, exp_db, clock):
++    app = create_app(Settings(database_url=database_url, export_max_rows=3), clock=clock)
++    with TestClient(app) as c:
++        r = post(c, tokens["ops"])
++    app.state.engine.dispose()
++    assert r.status_code == 422 and err(r) == "EXPORT_TOO_LARGE"
++    assert count_exports(exp_db) == 0
++
++
++def test_database_down_is_503_and_never_echoes_token():
++    app = create_app(Settings(database_url="postgresql+psycopg://nobody@127.0.0.1:1/none"))
++    with TestClient(app, raise_server_exceptions=False) as c:
++        r = post(c, "tok-secret-value-0123456789")
++    app.state.engine.dispose()
++    assert r.status_code == 503 and err(r) == "DEPENDENCY_UNAVAILABLE"
++    assert "tok-secret" not in r.text
++
++
++def test_token_never_logged(client, tokens, caplog):
++    caplog.set_level(logging.DEBUG)
++    post(client, tokens["ops"])
++    post(client, tokens["ops"], key="key-log-000002", building_id="BLD-B")
++    # Đối chứng: đường ghi log audit thật sự đã chạy (nếu không, test pass rỗng như ở RED 2).
++    assert "export created client=ops" in caplog.text and "export denied client=ops" in caplog.text
++    assert tokens["ops"] not in caplog.text
++
++
++def test_issued_token_is_stored_only_as_hash(exp_db):
++    from app.export_clients import issue_client
++    token = issue_client(exp_db, client_id="cli", name="CLI test", buildings=["BLD-A"], can_export=True)
++    row = exp_db.execute(text("SELECT token_sha256 FROM export_clients WHERE client_id='cli'")).scalar()
++    import hashlib
++    assert row == hashlib.sha256(token.encode()).hexdigest() and token not in row
++    dump = exp_db.execute(text("SELECT string_agg(t::text, '') FROM export_clients t")).scalar()
++    assert token not in dump
+diff --git a/tests/integration/backend/test_export_schema.py b/tests/integration/backend/test_export_schema.py
+new file mode 100644
+index 0000000..be0d74e
+--- /dev/null
++++ b/tests/integration/backend/test_export_schema.py
+@@ -0,0 +1,56 @@
++"""Hợp đồng ORM <-> migration và guard ở tầng DB (risk: mock che giấu contract sai với database)."""
++from __future__ import annotations
++
++import pytest
++from alembic.autogenerate import compare_metadata
++from alembic.migration import MigrationContext
++from export_helpers import make_client
++from sqlalchemy import text
++from sqlalchemy.exc import IntegrityError
++
++from app.models import Base
++
++EXPORT_TABLES = {"export_clients", "export_client_scopes", "exports"}
++
++
++def test_orm_models_match_alembic_schema(engine):
++    assert EXPORT_TABLES <= set(Base.metadata.tables), "ORM chưa khai báo bảng export"
++    with engine.connect() as conn:
++        diff = compare_metadata(MigrationContext.configure(conn), Base.metadata)
++    assert diff == [], diff
++
++
++def _insert_export(db, export_id: str, key: str):
++    db.execute(text("""
++        INSERT INTO exports (export_id, client_id, idempotency_key, request_hash, building_id, metric,
++                             start_at, end_at, row_count, content_sha256, content, created_at)
++        VALUES (:id, 'ops', :k, repeat('a', 64), 'BLD-A', 'power_kw', '2026-10-27T00:00:00Z',
++                '2026-10-27T00:03:00Z', 0, repeat('b', 64), '\\x', now())"""), {"id": export_id, "k": key})
++
++
++def test_database_enforces_one_export_per_client_and_key(db):
++    db.execute(text("TRUNCATE export_clients RESTART IDENTITY CASCADE"))
++    make_client(db, "ops", ["BLD-A"])
++    _insert_export(db, "00000000-0000-4000-8000-0000000000a1", "key-db-000001")
++    db.commit()
++    with pytest.raises(IntegrityError) as e:
++        _insert_export(db, "00000000-0000-4000-8000-0000000000a2", "key-db-000001")
++    assert "uq_exports_client_key" in str(e.value)
++    db.rollback()
++
++
++@pytest.mark.parametrize("start,end,constraint", [
++    ("2026-10-27T00:03:00Z", "2026-10-27T00:00:00Z", "ck_exports_range_order"),
++    ("2026-10-01T00:00:00Z", "2026-11-01T00:00:01Z", "ck_exports_range_max_31d"),
++])
++def test_database_enforces_range(db, start, end, constraint):
++    db.execute(text("TRUNCATE export_clients RESTART IDENTITY CASCADE"))
++    make_client(db, "ops", ["BLD-A"])
++    with pytest.raises(IntegrityError) as e:
++        db.execute(text("""
++            INSERT INTO exports (export_id, client_id, idempotency_key, request_hash, building_id, metric,
++                                 start_at, end_at, row_count, content_sha256, content, created_at)
++            VALUES (gen_random_uuid(), 'ops', 'key-range-0001', repeat('a', 64), 'BLD-A', 'power_kw',
++                    :s, :e, 0, repeat('b', 64), '\\x', now())"""), {"s": start, "e": end})
++    assert constraint in str(e.value)
++    db.rollback()
+diff --git a/tests/integration/backend/test_service_behaviour.py b/tests/integration/backend/test_service_behaviour.py
+index 17ac095..2750a3d 100644
+--- a/tests/integration/backend/test_service_behaviour.py
++++ b/tests/integration/backend/test_service_behaviour.py
+@@ -76,6 +76,8 @@ def test_openapi_matches_contract_and_checked_in_file(client):
+     assert paths == {
+         "/api/v1/buildings/summary": ["get"], "/api/v1/devices": ["get"],
+         "/api/v1/devices/{device_id}/readings": ["get"], "/api/v1/alerts": ["get"], "/api/v1/health/ready": ["get"],
++        # BT3 VT-023: API xuất dữ liệu có phân quyền.
++        "/api/v1/exports": ["post"], "/api/v1/exports/{export_id}": ["get"],
+     }
+     schemas = spec["components"]["schemas"]
+     fields = {k: set(schemas[k]["properties"]) for k in ("BuildingSummary", "Device", "Reading", "Alert")}
+diff --git a/tests/load/export_load.py b/tests/load/export_load.py
+new file mode 100644
+index 0000000..120f398
+--- /dev/null
++++ b/tests/load/export_load.py
+@@ -0,0 +1,196 @@
++#!/usr/bin/env python3
++"""BT3 VT-023 — kiểm chứng tải: 200 tác vụ đồng thời trên API export, mục tiêu p95 <= 5.0 s.
++
++Hai bước (server uvicorn thật + PostgreSQL thật, không mock):
++    # 1) chuẩn bị DB riêng (tên phải chứa "load"): schema Alembic, seed, readings tổng hợp, 2 client
++    DATABASE_URL=postgresql+psycopg://USER@localhost:5432/energy_load python tests/load/export_load.py prepare
++    # 2) chạy server rồi bắn tải
++    (cd src/backend && DATABASE_URL=... uvicorn app.main:create_app --factory --port 8800) &
++    python tests/load/export_load.py run --base http://127.0.0.1:8800 --tokens /tmp/bt3_tokens.json
++
++Kịch bản (bắt đầu cùng lúc bằng asyncio.Event):
++  150 tác vụ "own":    POST (key riêng) -> POST lại cùng key (replay) -> GET tải CSV, kiểm SHA-256 = ETag
++   40 tác vụ "shared": POST cùng MỘT key -> phải ra đúng 1 export (guard dưới tải)
++   10 tác vụ "deny":   POST building ngoài scope (404) / GET export của client khác (404)
++Dữ liệu: 3 thiết bị x 1440 reading power_kw/ngày (2026-11-01); mỗi export BLD-A = 2880 dòng (~330 KB).
++Giới hạn kết luận: 1 máy, 1 tiến trình uvicorn, server và client chung máy; không phải môi trường triển khai.
++"""
++from __future__ import annotations
++
++import argparse
++import asyncio
++import hashlib
++import json
++import os
++import platform
++import statistics
++import sys
++import time
++from datetime import datetime, timedelta, timezone
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++BACKEND = ROOT / "src" / "backend"
++DAY = datetime(2026, 11, 1, tzinfo=timezone.utc)
++BODY = {"building_id": "BLD-A", "metric": "power_kw", "start": "2026-11-01T00:00:00Z", "end": "2026-11-02T00:00:00Z"}
++N_OWN, N_SHARED, N_DENY = 150, 40, 10
++
++
++def prepare(tokens_path: Path) -> None:
++    url = os.environ["DATABASE_URL"]
++    sys.path.insert(0, str(BACKEND))
++    from alembic import command
++    from alembic.config import Config
++    from sqlalchemy import create_engine, text
++    from sqlalchemy.engine import make_url
++    from sqlalchemy.orm import Session
++
++    from app.export_clients import issue_client
++    from app.seed import apply_seed, load_registry
++
++    if "load" not in (make_url(url).database or ""):
++        sys.exit("Từ chối: tên database phải chứa 'load' (sẽ DROP SCHEMA public).")
++    eng = create_engine(url, connect_args={"options": "-c timezone=UTC"})
++    with eng.begin() as c:
++        c.execute(text("DROP SCHEMA public CASCADE"))
++        c.execute(text("CREATE SCHEMA public"))
++    cfg = Config(str(BACKEND / "alembic.ini"))
++    cfg.set_main_option("script_location", str(BACKEND / "alembic"))
++    command.upgrade(cfg, "head")
++    with Session(eng) as db:
++        apply_seed(db, load_registry(BACKEND / "seed" / "registry.json"))
++        rows = []
++        for dev in ("A-01", "A-02", "B-01"):
++            for i in range(1440):
++                ev = DAY + timedelta(minutes=i)
++                rows.append({"m": f"00000000-0000-4000-8{dev[0]}{dev[-1]}-{i:012d}".lower().replace("a", "a"),
++                             "d": dev, "ev": ev, "rc": ev + timedelta(seconds=1), "v": (i % 97) / 10})
++        db.execute(text("INSERT INTO readings (message_id, device_id, metric, event_time, received_at, value, "
++                        "is_late, is_out_of_order, period_seconds) VALUES (:m, :d, 'power_kw', :ev, :rc, :v, "
++                        "false, false, 60)"), rows)
++        db.commit()
++        tokens = {"ops": issue_client(db, client_id="load-ops", name="load", buildings=["BLD-A"], can_export=True),
++                  "other": issue_client(db, client_id="load-other", name="load2", buildings=["BLD-A", "BLD-B"],
++                                        can_export=True)}
++    tokens_path.write_text(json.dumps(tokens), "utf-8")
++    os.chmod(tokens_path, 0o600)
++    print(f"prepared: {len(rows)} readings, tokens -> {tokens_path}")
++
++
++def pct(values: list[float], p: float) -> float:
++    s = sorted(values)
++    return s[min(len(s) - 1, max(0, int(round(p / 100 * len(s) + 0.5)) - 1))]   # nearest-rank
++
++
++async def run(base: str, tokens: dict, out: Path) -> int:
++    import httpx
++
++    lat: dict[str, list[float]] = {"create": [], "replay": [], "download": [], "shared": [], "deny": []}
++    problems: list[str] = []
++    go = asyncio.Event()
++    limits = httpx.Limits(max_connections=N_OWN + N_SHARED + N_DENY, max_keepalive_connections=0)
++
++    async def timed(kind, coro):
++        t0 = time.perf_counter()
++        r = await coro
++        lat[kind].append(time.perf_counter() - t0)
++        return r
++
++    def h(tok, key=None):
++        d = {"Authorization": f"Bearer {tok}"}
++        if key:
++            d["Idempotency-Key"] = key
++        return d
++
++    async with httpx.AsyncClient(base_url=base, timeout=60, limits=limits) as c:
++        async def own(i):
++            await go.wait()
++            key = f"load-own-{i:04d}"
++            r1 = await timed("create", c.post("/api/v1/exports", json=BODY, headers=h(tokens["ops"], key)))
++            r2 = await timed("replay", c.post("/api/v1/exports", json=BODY, headers=h(tokens["ops"], key)))
++            if (r1.status_code, r2.status_code) != (201, 200) or r1.json()["data"] != r2.json()["data"]:
++                problems.append(f"own {i}: {r1.status_code}/{r2.status_code}")
++                return None
++            job = r1.json()["data"]
++            r3 = await timed("download", c.get(job["download_url"], headers=h(tokens["ops"])))
++            if r3.status_code != 200 or hashlib.sha256(r3.content).hexdigest() != job["content_sha256"] \
++                    or r3.content.count(b"\r\n") != job["row_count"] + 1 or job["row_count"] != 2880:
++                problems.append(f"own {i}: download mismatch")
++            return job["export_id"]
++
++        async def shared(i):
++            await go.wait()
++            r = await timed("shared", c.post("/api/v1/exports", json=BODY, headers=h(tokens["ops"], "load-shared-key")))
++            if r.status_code not in (200, 201):
++                problems.append(f"shared {i}: {r.status_code}")
++                return None
++            return r.status_code, r.json()["data"]["export_id"]
++
++        async def deny(i):
++            await go.wait()
++            if i % 2:
++                r = await timed("deny", c.post("/api/v1/exports", json={**BODY, "building_id": "BLD-B"},
++                                               headers=h(tokens["ops"], f"load-deny-{i:04d}")))
++            else:
++                r = await timed("deny", c.get("/api/v1/exports/00000000-0000-4000-8000-000000000000",
++                                              headers=h(tokens["other"])))
++            if r.status_code != 404:
++                problems.append(f"deny {i}: {r.status_code}")
++
++        tasks = ([asyncio.create_task(own(i)) for i in range(N_OWN)]
++                 + [asyncio.create_task(shared(i)) for i in range(N_SHARED)]
++                 + [asyncio.create_task(deny(i)) for i in range(N_DENY)])
++        await asyncio.sleep(0.5)
++        t0 = time.perf_counter()
++        go.set()
++        res = await asyncio.gather(*tasks, return_exceptions=True)
++        wall = time.perf_counter() - t0
++
++    errors = [repr(r)[:120] for r in res if isinstance(r, BaseException)]
++    shared_res = [r for r in res[N_OWN:N_OWN + N_SHARED] if isinstance(r, tuple)]
++    shared_ids = {eid for _, eid in shared_res}
++    shared_created = sum(1 for code, _ in shared_res if code == 201)
++    if len(shared_ids) != 1 or shared_created != 1:
++        problems.append(f"shared key: {len(shared_ids)} export_id, {shared_created} lần 201")
++    all_lat = [x for v in lat.values() for x in v]
++    report = {
++        "when": datetime.now(timezone.utc).isoformat(timespec="seconds"), "base": base,
++        "machine": {"python": platform.python_version(), "cpus": os.cpu_count(), "platform": platform.platform()},
++        "concurrent_tasks": N_OWN + N_SHARED + N_DENY, "requests": len(all_lat), "wall_s": round(wall, 3),
++        "p50_s": round(statistics.median(all_lat), 3), "p95_s": round(pct(all_lat, 95), 3),
++        "max_s": round(max(all_lat), 3),
++        "by_kind": {k: {"n": len(v), "p50_s": round(statistics.median(v), 3), "p95_s": round(pct(v, 95), 3),
++                        "max_s": round(max(v), 3)} for k, v in lat.items() if v},
++        "shared_key": {"responses": len(shared_res), "distinct_export_ids": len(shared_ids), "created_201": shared_created},
++        "exceptions": errors, "problems": problems[:20],
++        "target_p95_s": 5.0,
++    }
++    report["pass"] = report["p95_s"] <= 5.0 and not errors and not problems
++    out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", "utf-8")
++    print(json.dumps({k: report[k] for k in ("requests", "wall_s", "p50_s", "p95_s", "max_s", "shared_key", "pass")},
++                     ensure_ascii=False))
++    for k, v in report["by_kind"].items():
++        print(f"  {k:9s} {v}")
++    if errors or problems:
++        print("  exceptions:", errors[:3], "problems:", problems[:5])
++    return 0 if report["pass"] else 1
++
++
++def main() -> int:
++    ap = argparse.ArgumentParser()
++    sub = ap.add_subparsers(dest="cmd", required=True)
++    p = sub.add_parser("prepare")
++    p.add_argument("--tokens", type=Path, default=Path("/tmp/bt3_tokens.json"))
++    r = sub.add_parser("run")
++    r.add_argument("--base", default="http://127.0.0.1:8800")
++    r.add_argument("--tokens", type=Path, default=Path("/tmp/bt3_tokens.json"))
++    r.add_argument("--out", type=Path, default=Path("load-result.json"))
++    a = ap.parse_args()
++    if a.cmd == "prepare":
++        prepare(a.tokens)
++        return 0
++    return asyncio.run(run(a.base, json.loads(a.tokens.read_text("utf-8")), a.out))
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/tests/unit/backend/test_export_service.py b/tests/unit/backend/test_export_service.py
+new file mode 100644
+index 0000000..fdc9a78
+--- /dev/null
++++ b/tests/unit/backend/test_export_service.py
+@@ -0,0 +1,92 @@
++"""Unit test cho logic export với store GIẢ (in-memory), không cần DB.
++
++Có chủ đích: các test này chỉ kiểm hợp đồng mà store giả TỰ mô phỏng. Thí nghiệm mutation trong
++docs/testing/bt3-vt023/README.md cho thấy chúng vẫn pass khi guard ở PostgreSQL bị bỏ. Đây là minh hoạ cho
++risk "mock che giấu contract sai với database"; guard thật được kiểm ở tests/integration/backend.
++"""
++from __future__ import annotations
++
++from datetime import datetime, timezone
++from decimal import Decimal
++
++import pytest
++
++from app.exports import (
++    ExportRequest, ExportRow, ExportTooLarge, IdempotencyConflict, Principal, StoredExport, create_export, render_csv,
++)
++
++T0 = datetime(2026, 10, 27, tzinfo=timezone.utc)
++T3 = datetime(2026, 10, 27, 0, 3, tzinfo=timezone.utc)
++OPS = Principal(client_id="ops", can_export=True, buildings=frozenset({"BLD-A"}))
++
++
++class FakeStore:
++    def __init__(self):
++        self.rows: dict[tuple[str, str], StoredExport] = {}
++
++    def find(self, client_id: str, key: str) -> StoredExport | None:
++        return self.rows.get((client_id, key))
++
++    def insert_if_absent(self, export: StoredExport) -> bool:
++        k = (export.client_id, export.idempotency_key)
++        if k in self.rows:
++            return False
++        self.rows[k] = export
++        return True
++
++
++def row(i: int, device: str = "A-01", value: str = "1") -> ExportRow:
++    return ExportRow(message_id=f"m-{i}", device_id=device, building_id="BLD-A", metric="power_kw",
++                     event_time=datetime(2026, 10, 27, 0, 0, i, tzinfo=timezone.utc),
++                     received_at=datetime(2026, 10, 27, 0, 0, i, tzinfo=timezone.utc), interval_start=None,
++                     value=Decimal(value), unit="kW", is_late=False, is_out_of_order=False)
++
++
++class Source:
++    def __init__(self, rows):
++        self.rows, self.calls = rows, 0
++
++    def __call__(self, building_id, metric, start, end, limit):
++        self.calls += 1
++        return self.rows[:limit]
++
++
++REQ = ExportRequest(building_id="BLD-A", metric="power_kw", start=T0, end=T3)
++
++
++def test_replay_returns_same_export_without_regenerating():
++    store, src = FakeStore(), Source([row(1), row(2)])
++    a, created_a = create_export(store, src, OPS, "key-unit-0001", REQ, now=T3, max_rows=10)
++    b, created_b = create_export(store, src, OPS, "key-unit-0001", REQ, now=T3, max_rows=10)
++    assert (created_a, created_b) == (True, False) and a == b and src.calls == 1
++
++
++def test_same_key_different_request_conflicts():
++    store = FakeStore()
++    create_export(store, Source([row(1)]), OPS, "key-unit-0002", REQ, now=T3, max_rows=10)
++    other = ExportRequest(building_id="BLD-A", metric="energy_kwh", start=T0, end=T3)
++    with pytest.raises(IdempotencyConflict):
++        create_export(store, Source([]), OPS, "key-unit-0002", other, now=T3, max_rows=10)
++
++
++def test_too_large_stores_nothing():
++    store = FakeStore()
++    with pytest.raises(ExportTooLarge):
++        create_export(store, Source([row(i) for i in range(5)]), OPS, "key-unit-0003", REQ, now=T3, max_rows=4)
++    assert store.rows == {}
++
++
++def test_request_hash_ignores_nothing_that_changes_the_result():
++    a = ExportRequest(building_id="BLD-A", metric="power_kw", start=T0, end=T3)
++    assert a.request_hash() == ExportRequest(building_id="BLD-A", metric="power_kw", start=T0, end=T3).request_hash()
++    assert a.request_hash() != ExportRequest(building_id="BLD-A", metric="power_kw", start=T0,
++                                             end=datetime(2026, 10, 27, 0, 2, tzinfo=timezone.utc)).request_hash()
++
++
++def test_render_csv_header_decimal_and_formula_guard():
++    text = render_csv([row(1, value="0.000000001"), row(2, device="-A1", value="12.500")]).decode()
++    lines = text.splitlines()
++    assert lines[0] == ("message_id,device_id,building_id,metric,event_time,received_at,interval_start,"
++                        "value,unit,is_late,is_out_of_order")
++    assert lines[1].split(",")[7] == "0.000000001"
++    assert lines[2].split(",")[1] == "'-A1" and lines[2].split(",")[7] == "12.5"
+diff --git a/tools/scripts/bt3_mutation.py b/tools/scripts/bt3_mutation.py
+new file mode 100644
+index 0000000..b81db6f
+--- /dev/null
++++ b/tools/scripts/bt3_mutation.py
+@@ -0,0 +1,113 @@
++#!/usr/bin/env python3
++"""BT3 VT-023 — thí nghiệm mutation "bỏ idempotency/concurrency guard".
++
++Mỗi mutant được áp vào một git worktree TẠM (detached HEAD), chạy test rồi xoá worktree; nhánh nộp bài
++không bao giờ chứa mutant. Diff của mỗi mutant được lưu ở docs/testing/bt3-vt023/mutants/<id>.patch.
++
++    TEST_DATABASE_URL=postgresql+psycopg://USER@localhost:5432/energy_test \
++        python tools/scripts/bt3_mutation.py [--repeat 10] [--only M1,M2]
++"""
++from __future__ import annotations
++
++import argparse
++import json
++import os
++import re
++import subprocess
++import sys
++import tempfile
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++OUT = ROOT / "docs" / "testing" / "bt3-vt023"
++EXPORTS = "src/backend/app/exports.py"
++MODELS = "src/backend/app/models.py"
++MIGRATION = "src/backend/alembic/versions/0002_export_api.py"
++CONCURRENT = "../../tests/integration/backend/test_export_api.py::test_idempotency_concurrent_retries_create_exactly_one"
++
++MUTANTS = {
++    "M1": ("Bỏ ON CONFLICT: kiểm-rồi-chèn ở ứng dụng, vẫn giữ UNIQUE ở DB", [
++        (EXPORTS, '            .on_conflict_do_nothing(constraint="uq_exports_client_key")\n', ""),
++    ]),
++    "M2": ("Bỏ toàn bộ guard: không ON CONFLICT, không UNIQUE (migration và ORM)", [
++        (EXPORTS, '            .on_conflict_do_nothing(constraint="uq_exports_client_key")\n', ""),
++        (MIGRATION, "            CONSTRAINT uq_exports_client_key UNIQUE (client_id, idempotency_key),\n", ""),
++        (MODELS, '        UniqueConstraint("client_id", "idempotency_key", name="uq_exports_client_key"),\n', ""),
++    ]),
++    "M3": ("Bỏ UNIQUE ở migration nhưng ORM vẫn khai báo (lệch contract ORM <-> DB)", [
++        (MIGRATION, "            CONSTRAINT uq_exports_client_key UNIQUE (client_id, idempotency_key),\n", ""),
++    ]),
++    "M4": ("Replay không so sánh request_hash (cùng key, body khác vẫn trả export cũ)", [
++        (EXPORTS, "    if existing.request_hash != want_hash:\n        raise IdempotencyConflict()\n", ""),
++    ]),
++}
++
++SUMMARY = re.compile(r"(\d+) (passed|failed|error|errors)")
++
++
++def sh(cmd: list[str], cwd: Path, env=None) -> subprocess.CompletedProcess:
++    return subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True)
++
++
++def pytest(wt: Path, args: list[str]) -> tuple[dict, list[str], str]:
++    env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
++    r = sh([sys.executable, "-m", "pytest", "-c", "pyproject.toml", "-p", "no:cacheprovider", "-q", "-rfE", *args],
++           wt / "src" / "backend", env)
++    counts = {k: int(n) for n, k in SUMMARY.findall(r.stdout.splitlines()[-1] if r.stdout else "")}
++    failed = sorted({ln.split(" ", 1)[1].split(" - ")[0] for ln in r.stdout.splitlines()
++                     if ln.startswith(("FAILED ", "ERROR ")) and "::" in ln.split(" ", 2)[1]})
++    return counts, failed, r.stdout
++
++
++def main() -> int:
++    ap = argparse.ArgumentParser()
++    ap.add_argument("--repeat", type=int, default=10, help="số lần chạy lại test đồng thời trên mỗi mutant")
++    ap.add_argument("--only", default="")
++    a = ap.parse_args()
++    if not os.environ.get("TEST_DATABASE_URL"):
++        sys.exit("Cần TEST_DATABASE_URL")
++    head = sh(["git", "rev-parse", "--short", "HEAD"], ROOT).stdout.strip()
++    (OUT / "mutants").mkdir(parents=True, exist_ok=True)
++    results = {"base_commit": head, "mutants": {}}
++    for mid, (desc, edits) in MUTANTS.items():
++        if a.only and mid not in a.only.split(","):
++            continue
++        wt = Path(tempfile.mkdtemp(prefix=f"bt3-{mid}-"))
++        sh(["git", "worktree", "add", "--detach", str(wt), "HEAD"], ROOT)
++        try:
++            for f, old, new in edits:
++                p = wt / f
++                s = p.read_text("utf-8")
++                assert s.count(old) == 1, f"{mid}: không tìm thấy đúng một chỗ cần sửa trong {f}"
++                p.write_text(s.replace(old, new), "utf-8")
++            (OUT / "mutants" / f"{mid}.patch").write_text(sh(["git", "diff"], wt).stdout, "utf-8")
++            full_counts, full_failed, _ = pytest(wt, [])
++            unit_counts, unit_failed, _ = pytest(wt, ["../../tests/unit/backend"])
++            kills, observed = 0, []
++            for _ in range(a.repeat):
++                c, _, out = pytest(wt, [CONCURRENT])
++                if c.get("failed", 0) or c.get("error", 0):
++                    kills += 1
++                    observed += [ln.strip()[:160] for ln in out.splitlines() if ln.startswith("E ") and "Counter(" in ln][:1]
++            results["mutants"][mid] = {
++                "description": desc, "full_suite": full_counts, "killed_by": full_failed,
++                "unit_tests_with_fake_store": unit_counts,
++                "concurrent_test_kill_rate": f"{kills}/{a.repeat}",
++                "concurrent_test_observed": observed[:3],
++                "status": "KILLED" if full_failed else "SURVIVED",
++            }
++            print(f"{mid}: {results['mutants'][mid]['status']} full={full_counts} unit={unit_counts} "
++                  f"concurrent={kills}/{a.repeat}")
++            for t in full_failed:
++                print("   ", t)
++            for o in observed[:2]:
++                print("    observed:", o)
++        finally:
++            sh(["git", "worktree", "remove", "--force", str(wt)], ROOT)
++    (OUT / "results").mkdir(exist_ok=True)
++    (OUT / "results" / "mutation.json").write_text(json.dumps(results, ensure_ascii=False, indent=2) + "\n", "utf-8")
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())

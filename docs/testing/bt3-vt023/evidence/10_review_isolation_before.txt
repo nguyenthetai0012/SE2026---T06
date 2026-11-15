@@ -1,0 +1,7 @@
+# AI review #6 — chạy TC11 khi DB đặt default_transaction_isolation=repeatable read (trên a3fdb73/2ea64ee, chưa sửa)
+E       AssertionError: Counter({200: 15, 503: 14, 201: 1})
+1 failed, 1 warning in 0.51s
+E       AssertionError: Counter({200: 20, 503: 9, 201: 1})
+1 failed, 1 warning in 0.51s
+E       AssertionError: Counter({200: 15, 503: 14, 201: 1})
+1 failed, 1 warning in 0.54s

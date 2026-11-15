@@ -1,0 +1,24 @@
+prepared: 4320 readings, tokens -> /tmp/bt3_tokens.json
+== run 1
+{"requests": 500, "wall_s": 13.694, "p50_s": 1.008, "p95_s": 12.02, "max_s": 12.051, "shared_key": {"responses": 40, "distinct_export_ids": 1, "created_201": 1}, "pass": false}
+  create    {'n': 150, 'p50_s': 11.904, 'p95_s': 12.028, 'max_s': 12.051}
+  replay    {'n': 150, 'p50_s': 0.985, 'p95_s': 1.095, 'max_s': 1.198}
+  download  {'n': 150, 'p50_s': 0.521, 'p95_s': 0.872, 'max_s': 0.921}
+  shared    {'n': 40, 'p50_s': 12.007, 'p95_s': 12.022, 'max_s': 12.027}
+  deny      {'n': 10, 'p50_s': 6.338, 'p95_s': 11.892, 'max_s': 11.892}
+prepared: 4320 readings, tokens -> /tmp/bt3_tokens.json
+== run 2
+{"requests": 500, "wall_s": 14.001, "p50_s": 1.053, "p95_s": 12.424, "max_s": 12.456, "shared_key": {"responses": 40, "distinct_export_ids": 1, "created_201": 1}, "pass": false}
+  create    {'n': 150, 'p50_s': 12.256, 'p95_s': 12.437, 'max_s': 12.456}
+  replay    {'n': 150, 'p50_s': 0.991, 'p95_s': 1.136, 'max_s': 1.232}
+  download  {'n': 150, 'p50_s': 0.449, 'p95_s': 1.065, 'max_s': 1.071}
+  shared    {'n': 40, 'p50_s': 12.42, 'p95_s': 12.43, 'max_s': 12.434}
+  deny      {'n': 10, 'p50_s': 6.172, 'p95_s': 12.229, 'max_s': 12.229}
+prepared: 4320 readings, tokens -> /tmp/bt3_tokens.json
+== run 3
+{"requests": 500, "wall_s": 14.088, "p50_s": 0.934, "p95_s": 12.606, "max_s": 12.625, "shared_key": {"responses": 40, "distinct_export_ids": 1, "created_201": 1}, "pass": false}
+  create    {'n': 150, 'p50_s': 12.48, 'p95_s': 12.615, 'max_s': 12.625}
+  replay    {'n': 150, 'p50_s': 0.916, 'p95_s': 0.988, 'max_s': 1.021}
+  download  {'n': 150, 'p50_s': 0.387, 'p95_s': 0.774, 'max_s': 0.805}
+  shared    {'n': 40, 'p50_s': 12.604, 'p95_s': 12.61, 'max_s': 12.612}
+  deny      {'n': 10, 'p50_s': 6.703, 'p95_s': 12.45, 'max_s': 12.45}

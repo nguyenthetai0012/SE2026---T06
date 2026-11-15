@@ -1,0 +1,6 @@
+w1 run1 {'create': 5.981, 'replay': 1.208, 'download': 1.059, 'shared': 6.006, 'deny': 5.841} deny p50 2.929
+w1 run2 {'create': 5.312, 'replay': 1.16, 'download': 0.892, 'shared': 5.33, 'deny': 5.142} deny p50 2.747
+w1 run3 {'create': 6.077, 'replay': 1.182, 'download': 0.924, 'shared': 6.078, 'deny': 5.893} deny p50 3.043
+w2 run1 {'create': 4.881, 'replay': 2.571, 'download': 0.43, 'shared': 4.874, 'deny': 2.739} deny p50 2.31
+w2 run2 {'create': 5.097, 'replay': 2.579, 'download': 0.455, 'shared': 5.076, 'deny': 2.88} deny p50 1.968
+w2 run3 {'create': 4.857, 'replay': 2.896, 'download': 0.439, 'shared': 4.853, 'deny': 2.461} deny p50 1.782

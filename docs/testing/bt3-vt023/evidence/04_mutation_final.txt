@@ -1,0 +1,10 @@
+M1: KILLED full={'failed': 1, 'passed': 123} unit={'passed': 5} concurrent=10/10
+    observed: E       AssertionError: Counter({200: 24, 500: 5, 201: 1})
+    observed: E       AssertionError: Counter({200: 21, 500: 8, 201: 1})
+M2: KILLED full={'failed': 2, 'passed': 122} unit={'passed': 5} concurrent=10/10
+    observed: E       AssertionError: Counter({200: 23, 201: 7})
+    observed: E       AssertionError: Counter({201: 15, 200: 15})
+M3: KILLED full={'failed': 12, 'passed': 106, 'error': 6} unit={'passed': 5} concurrent=10/10
+    observed: E       AssertionError: Counter({500: 30})
+    observed: E       AssertionError: Counter({500: 30})
+M4: KILLED full={'failed': 2, 'passed': 122} unit={'failed': 1, 'passed': 4} concurrent=0/10
