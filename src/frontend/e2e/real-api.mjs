@@ -3,8 +3,9 @@ import assert from 'node:assert/strict'
 
 async function main() {
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true, args: ['--no-sandbox'] })
+  let page
   try {
-    const page = await browser.newPage()
+    page = await browser.newPage()
     const failures = []
     page.on('pageerror', (error) => {
       failures.push(error.message)
@@ -14,6 +15,9 @@ async function main() {
       if (message.type() === 'error') console.error('Browser console:', message.text())
     })
     page.on('requestfailed', (request) => console.error('Request failed:', request.url(), request.failure()?.errorText))
+    page.on('response', (response) => {
+      if (response.status() >= 400) console.error('HTTP error:', response.status(), response.url())
+    })
     await page.goto('http://127.0.0.1:5173/', { waitUntil: 'domcontentloaded' })
     await page.getByTestId('summary-BLD-A').waitFor()
     await page.getByTestId('summary-BLD-B').waitFor()
@@ -34,6 +38,7 @@ async function main() {
     process.stdout.write('Chrome loaded API-backed overview, filtered devices, empty history and alerts.\n')
   } catch (error) {
     console.error('Browser test failed:', error)
+    if (page) console.error('Visible page:', await page.locator('body').innerText())
     throw error
   } finally {
     await browser.close()
