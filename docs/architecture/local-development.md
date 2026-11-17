@@ -126,9 +126,14 @@ The repository includes an optional Backend QA configuration:
 
 - `.github/workflows/qa.yml`
 
-The GitHub Actions workflow exposes a manual `workflow_dispatch` input named `backend_ready`.
+With Backend in the checkout, run from the repository root:
 
-When Backend implementation is available in the checked-out revision, the workflow can run migration and API integration tests against a disposable PostgreSQL database and upload QA evidence as an artifact.
+```sh
+python tools/scripts/dev.py init
+python tools/scripts/backend_qa.py
+```
+
+The runner requires Docker Compose, creates a disposable `app05_test` database and runs the real Backend migration, registry seed and API integration tests. The tests drop the test schema: never point them at a shared or production database. Reports go to `build/qa/`; they are local output and must not be committed. The QA workflow runs the same job on pull requests and main, uploads its reports, and supports manual dispatch. The separate frontend workflow tests the UI; neither smoke job is a full-system test.
 
 A successful infrastructure smoke check is not a substitute for this Backend QA job.
 
@@ -183,3 +188,22 @@ executed and their results have been recorded.
 - [MVP implementation guide](../tasks/mvp-implementation.md)
 
 - [MVP baseline](../decisions/mvp-baseline.md)
+
+
+## 12. Integration and bounded load plan (Issues #22 and #39)
+
+Backend API setup and health checks are in [Backend README](../../src/backend/README.md); the Dashboard mock/API switch is in [Frontend README](../../src/frontend/README.md). Start a test-only database, migrate and seed, start the API and check `/api/v1/health/ready` before starting the UI. The optional Compose QA runner above checks the backend in an isolated database; it does not start the dashboard or ingestion worker.
+
+The worker is under review in PR #41; Simulator #36 has not supplied an integration-ready revision. Their startup, shutdown and configuration instructions must be confirmed by Tài and An before this guide can claim a reproducible full-stack run. Sương must verify the browser against API data originating from MQTT. Record exact commits, versions, commands, non-secret configuration, observed IDs and results; do not reset any shared database. MQTT anonymous mode is only for a trusted local test.
+
+| Scenario | Input and observation after MQTT, DB and API are available | Status |
+| --- | --- | --- |
+| Valid | Publish a unique registered device reading; verify ID, building, value and timestamps in DB and history API, then Dashboard. | Pending Simulator and joint E2E run |
+| Invalid | Publish a malformed or mismatched reading; compare DB, alerts and device timestamps before/after, verify rejection. | Pending broker-to-API run |
+| Duplicate | Republish identical message ID and body; assert exactly one reading and no duplicate alert or status change. | Pending broker-to-API run |
+| Late | Publish an old event with unique ID; verify `is_late`, event/receive times and unchanged latest event watermark. | Pending broker-to-API run |
+| Out of order | Send newer then older event for one device/metric; assert both persisted, correct flag and API event ordering. | Pending broker-to-API run |
+
+### Bounded load preparation
+
+An and Ngọc must agree an isolated test profile before running: registry, deterministic seed, explicit finite message count or duration, rate and maximum concurrency; start small and stop on errors. Save the generated message IDs and expected counts. After publisher completion, wait for the worker to drain with a bounded timeout; reconcile unique accepted IDs against database and API, accounting for deliberate duplicate and invalid inputs. Record sent, accepted, rejected, duplicates, pending and failures, throughput, ingest/API latency percentiles and resource usage, with environment, versions and commit SHAs. Mark the run inconclusive if pending messages or discrepancies remain. No throughput or latency SLA is established, and no load result is claimed here.
