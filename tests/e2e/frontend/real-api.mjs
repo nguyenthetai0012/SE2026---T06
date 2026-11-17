@@ -1,4 +1,6 @@
-import { chromium } from 'playwright-core'
+import { createRequire } from 'node:module'
+const require = createRequire(new URL('../../../src/frontend/package.json', import.meta.url))
+const { chromium } = require('playwright-core')
 import assert from 'node:assert/strict'
 
 async function main() {

@@ -3,11 +3,11 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'coverage/**'] },
+  { ignores: ['**/dist/**', '**/coverage/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['e2e/**/*.mjs'],
+    files: ['**/tests/e2e/frontend/**/*.mjs'],
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
   },
   {

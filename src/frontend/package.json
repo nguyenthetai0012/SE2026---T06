@@ -9,11 +9,12 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "lint": "eslint .",
+    "lint": "cd ../.. && node src/frontend/node_modules/eslint/bin/eslint.js src/frontend tests/integration/frontend tests/e2e/frontend",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "react": "19.1.1",

@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { HttpDashboardRepository } from '../api/httpRepository'
-import { DevicesPage } from '../features/devices/DevicesPage'
+import { HttpDashboardRepository } from '../../../src/frontend/src/api/httpRepository'
+import { DevicesPage } from '../../../src/frontend/src/features/devices/DevicesPage'
 
 const apiUrl = import.meta.env.VITE_TEST_API_URL
 

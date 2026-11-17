@@ -88,14 +88,14 @@ jobs:
         run: npm ci
       - name: Test Frontend against Backend API
         working-directory: src/frontend
-        run: npm run test:run -- src/test/backend-integration.test.tsx
+        run: npm run test:integration
       - name: Check real API mode in Chrome
         working-directory: src/frontend
         run: |
           npm install --no-save --package-lock=false playwright-core@1.55.1
           npm run dev -- --host 127.0.0.1 --port 5173 --strictPort > /tmp/app05-frontend.log 2>&1 &
           curl --fail --retry 20 --retry-delay 1 --retry-connrefused http://127.0.0.1:5173/
-          node e2e/real-api.mjs
+          node ../../tests/e2e/frontend/real-api.mjs
       - name: Show Backend log if integration fails
         if: failure()
         run: |
