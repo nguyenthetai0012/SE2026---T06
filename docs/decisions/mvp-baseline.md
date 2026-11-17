@@ -1,8 +1,9 @@
 # APP-05 — Baseline tài liệu MVP để bắt đầu triển khai
 
-Trạng thái: **PROPOSED — bộ phương án hoàn chỉnh để duyệt chung**, ngày 2026-10-27.
-Sương yêu cầu hoàn thiện tài liệu cả nhóm; điều này không thay thế xác nhận của Tài/An/Ngọc.
-PR được merge sau review là mốc chấp nhận baseline; hiện chưa có bằng chứng nhóm duyệt các lựa chọn mới dưới đây.
+Trạng thái: **ACCEPTED MỘT PHẦN** — PR #27 được merge vào `main` ngày 2026-10-31 (merge commit `43b5f24`; nội dung tại `1715546`). Bản đề xuất ban đầu ngày 2026-10-27.
+Xác nhận có bằng chứng trên PR #27: **Tài** (Backend: stack, model, aggregate, API; review và approve), **An** (interval energy, topic `campus/v1/{building_id}/{device_id}/readings`, chu kỳ 60 giây, idempotency, fixture; bình luận 2026-10-31).
+**Chưa có xác nhận trên PR:** **Sương** (DTO/state/mock đáp ứng AC01–12; đã đề xuất và sửa nội dung nhưng chưa ghi xác nhận) và **Ngọc** (test oracle, Compose/CI, secrets, báo cáo load). Tài đã chạy lại oracle thay cho bước kiểm tra này (xem bình luận QA trên #27), việc đó không thay xác nhận của Ngọc.
+Các lựa chọn mang tên của người chưa xác nhận vẫn là đề xuất cho đến khi họ xác nhận; có thể sửa bằng PR riêng. Mọi lệnh chạy trong tài liệu triển khai vẫn **chưa được kiểm chứng**.
 
 ## 1. Phạm vi và nguồn
 
@@ -88,3 +89,4 @@ Tài điều phối review PR này; mỗi người rà đúng phần chuyên mô
 - Sương: dữ liệu đủ AC01–12, mock/real cùng DTO.
 - Ngọc: test oracle, compose, secrets và báo cáo load.
 Sau khi Tài ghi nhận thống nhất và merge, cập nhật trạng thái baseline thành Accepted và SHA phê duyệt. Không đánh dấu những ô trên đã được duyệt trước khi có bằng chứng.
+Ghi nhận ngày 2026-10-31: ô của Tài và An có bằng chứng; ô của Sương và Ngọc chưa có (xem trạng thái ở đầu tài liệu). Trạng thái chuyển thành Accepted đầy đủ khi hai xác nhận còn lại được ghi trên PR hoặc Issue.
