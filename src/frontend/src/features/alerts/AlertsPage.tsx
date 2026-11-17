@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { DashboardRepository } from '../../api/repository'
 import { formatDateTime, formatNumber } from '../../api/format'
 import { AppLink } from '../../app/navigation'
@@ -8,8 +8,15 @@ import { useDashboardQuery } from '../../components/useDashboardQuery'
 export function AlertsPage({ repository }: { repository: DashboardRepository }) {
   const [buildingId, setBuildingId] = useState('')
   const [deviceId, setDeviceId] = useState('')
-  const load = useCallback(() => repository.getAlerts({ buildingId: buildingId || undefined, deviceId: deviceId || undefined }), [repository, buildingId, deviceId])
-  const query = useDashboardQuery(`alerts:${buildingId}:${deviceId}`, load)
+  const filterKey = JSON.stringify([buildingId, deviceId])
+  const [paging, setPaging] = useState<{ key: string; cursors: (string | null)[] }>({ key: filterKey, cursors: [null] })
+  useEffect(() => { setPaging({ key: filterKey, cursors: [null] }) }, [filterKey])
+  const cursors = paging.key === filterKey ? paging.cursors : [null]
+  const cursor = cursors[cursors.length - 1]
+  const load = useCallback(() => repository.getAlerts({ buildingId: buildingId || undefined, deviceId: deviceId || undefined, cursor }), [repository, buildingId, deviceId, cursor])
+  const query = useDashboardQuery(`${filterKey}:${cursor ?? ''}`, load)
+  const nextPage = (next: string) => setPaging({ key: filterKey, cursors: [...cursors, next] })
+  const previousPage = () => setPaging({ key: filterKey, cursors: cursors.slice(0, -1) })
 
   return (
     <section aria-labelledby="alerts-title">
@@ -26,6 +33,11 @@ export function AlertsPage({ repository }: { repository: DashboardRepository }) 
           </div>
         )}
       </QueryPanel>
+      <nav aria-label="Phân trang" className="toolbar">
+        <button type="button" disabled={cursors.length === 1 || query.loading} onClick={previousPage}>Trang trước</button>
+        <span>Trang {cursors.length}</span>
+        <button type="button" disabled={!query.data?.meta.nextCursor || query.loading || !!query.error} onClick={() => { if (query.data?.meta.nextCursor) nextPage(query.data.meta.nextCursor) }}>Trang tiếp</button>
+      </nav>
     </section>
   )
 }

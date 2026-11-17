@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { Metric } from '../../api/dto'
 import type { DashboardRepository } from '../../api/repository'
 import type { Reading, TimeRange } from '../../api/models'
@@ -10,8 +10,15 @@ import { useDashboardQuery } from '../../components/useDashboardQuery'
 export function HistoryPage({ repository, deviceId }: { repository: DashboardRepository; deviceId: string }) {
   const [metric, setMetric] = useState<Metric>('power_kw')
   const [range, setRange] = useState(() => repository.getDefaultHistoryRange())
-  const load = useCallback(() => repository.getReadings({ deviceId, metric, range, limit: 100 }), [repository, deviceId, metric, range])
-  const query = useDashboardQuery(`history:${deviceId}:${metric}:${range.start}:${range.end}`, load)
+  const filterKey = JSON.stringify([deviceId, metric, range.start, range.end])
+  const [paging, setPaging] = useState<{ key: string; cursors: (string | null)[] }>({ key: filterKey, cursors: [null] })
+  useEffect(() => { setPaging({ key: filterKey, cursors: [null] }) }, [filterKey])
+  const cursors = paging.key === filterKey ? paging.cursors : [null]
+  const cursor = cursors[cursors.length - 1]
+  const load = useCallback(() => repository.getReadings({ deviceId, metric, range, limit: 100, cursor }), [repository, deviceId, metric, range, cursor])
+  const query = useDashboardQuery(`${filterKey}:${cursor ?? ''}`, load)
+  const nextPage = (next: string) => setPaging({ key: filterKey, cursors: [...cursors, next] })
+  const previousPage = () => setPaging({ key: filterKey, cursors: cursors.slice(0, -1) })
 
   return (
     <section aria-labelledby="history-title">
@@ -20,6 +27,11 @@ export function HistoryPage({ repository, deviceId }: { repository: DashboardRep
       <QueryPanel state={query} retry={query.retry} isEmpty={(page) => page.items.length === 0} emptyText="Không có bản ghi phù hợp với thiết bị, thông số và khoảng thời gian đã chọn.">
         {(page) => <HistoryResults readings={page.items} nextCursor={page.meta.nextCursor} range={range} />}
       </QueryPanel>
+      <nav aria-label="Phân trang" className="toolbar">
+        <button type="button" disabled={cursors.length === 1 || query.loading} onClick={previousPage}>Trang trước</button>
+        <span>Trang {cursors.length}</span>
+        <button type="button" disabled={!query.data?.meta.nextCursor || query.loading || !!query.error} onClick={() => { if (query.data?.meta.nextCursor) nextPage(query.data.meta.nextCursor) }}>Trang tiếp</button>
+      </nav>
     </section>
   )
 }

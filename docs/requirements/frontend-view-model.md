@@ -5,13 +5,13 @@ Nguồn: [Issue #12](https://github.com/nguyenthetai0012/SE2026---T06/issues/12)
 
 ## Trạng thái nguồn và các giả định cô lập
 
-`docs/decisions/mvp-baseline.md` cùng các DTO `mvp-api.md` trên PR #27 vẫn ở trạng thái **PROPOSED**; PR đang mở không phải bằng chứng cả nhóm đã duyệt contract. Comment review của Tài đồng ý riêng với React/TypeScript/Vite, nhưng PR #27 vẫn đang chờ review/xác nhận các phần khác. Vì vậy:
+PR #27 đã merge vào `main`; `docs/decisions/mvp-baseline.md` ghi baseline được chấp thuận một phần. Các xác nhận còn thiếu vẫn cần hoàn tất tại Issue #21. DTO hiện đối chiếu với `docs/contracts/mvp-api.md` và OpenAPI Backend trên `main`:
 
-- Frontend dùng các DTO snake_case của PR #27 làm **wire shape tạm thời** trong `src/api/dto.ts`.
+- Frontend dùng DTO snake_case từ `docs/contracts/mvp-api.md` trong `src/api/dto.ts`.
 - `src/api/mapper.ts` là nơi duy nhất đổi wire DTO sang view model camelCase cho giao diện.
 - `src/api/repository.ts` là nơi duy nhất chọn mock hay API; API endpoint và query mapping nằm trong `src/api/httpRepository.ts`.
 - Mock nằm trong `src/mocks/`; component không rẽ nhánh theo chế độ mock/API.
-- Bất kỳ thay đổi DTO sau khi PR #27 được duyệt chỉ cần sửa adapter/mapping và fixture tương ứng; giao diện phụ thuộc view model.
+- Khi DTO thay đổi, cập nhật adapter/mapping, fixture và kiểm thử tương ứng; giao diện phụ thuộc view model.
 
 ## Dữ liệu theo màn hình
 
@@ -22,7 +22,7 @@ Nguồn: [Issue #12](https://github.com/nguyenthetai0012/SE2026---T06/issues/12)
 | Lịch sử | Message/device/building ID, metric, event/received time, interval, value/unit, late/out-of-order | `Reading` | Lọc theo device/metric/range; giữ cờ do nguồn trả về; hiển thị bảng cùng biểu đồ đơn giản. Không suy cờ từ timestamp phía browser. |
 | Cảnh báo | Alert/message/device/building ID, event/detected time, metric, value/threshold/unit, description | `Alert` | Chỉ hiển thị alert do repository trả về; không tự tạo alert, severity, trạng thái xử lý hay ngưỡng. |
 
-Các tên field, route, metric, status và envelope ở cột DTO lấy từ đề xuất PR #27, chưa phải API contract được nhóm chấp thuận. Nhãn và ngữ nghĩa chỉ được thay khi nhóm duyệt contract.
+Các field và route lấy từ `docs/contracts/mvp-api.md` trên `main`; trạng thái xác nhận từng phần được ghi trong baseline và Issue #21. Không tự coi phần chưa xác nhận là đã được toàn nhóm duyệt.
 
 ## Mock scenarios
 
