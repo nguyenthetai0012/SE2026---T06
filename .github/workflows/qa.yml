@@ -6,11 +6,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      backend_ready:
-        description: 'Run real Backend tests (requires Backend merged into this checkout)'
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -50,7 +45,6 @@ jobs:
 
   backend:
     name: Backend migration and API integration
-    if: github.event_name == 'workflow_dispatch' && inputs.backend_ready
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
