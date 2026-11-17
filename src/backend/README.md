@@ -30,6 +30,8 @@ python -m app.seed                        # nạp registry từ seed/registry.js
 uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000
 ```
 
+Seed có thể chạy khi worker đang ingest: seed khóa dòng device (`SELECT ... FOR UPDATE`) trước khi kiểm tra readings, nên mọi đường ghi readings cũng phải khóa dòng device trong cùng transaction (worker chờ tối đa `statement_timeout`).
+
 Windows (PowerShell):
 
 ```powershell

@@ -56,38 +56,54 @@ def load_registry(path: Path) -> dict:
 
 
 def apply_seed(db: Session, data: dict) -> dict[str, list[str]]:
-    """Upsert idempotent. Trả diff {inserted, updated, unchanged}. Không đổi building/chu kỳ/ngưỡng của device đã có readings."""
+    """Upsert idempotent. Trả diff {inserted, updated, unchanged}. Không đổi building/chu kỳ/ngưỡng của device đã có readings.
+
+    Chạy được khi worker đang ingest: seed khóa dòng device (SELECT ... FOR UPDATE) trước khi so sánh và đếm readings,
+    cùng dòng mà worker khóa trước khi ghi reading. Bất biến: MỌI đường ghi readings phải khóa dòng device trong cùng
+    transaction. Khi SeedError, transaction được rollback ngay để nhả khóa.
+    """
     diff: dict[str, list[str]] = {"inserted": [], "updated": [], "unchanged": []}
-    for b in data["buildings"]:
-        row = db.get(Building, b["building_id"])
-        if row is None:
-            db.add(Building(**b)); diff["inserted"].append(f"building:{b['building_id']}")
-        elif row.name != b["name"]:
-            row.name = b["name"]; diff["updated"].append(f"building:{b['building_id']}")
-        else:
-            diff["unchanged"].append(f"building:{b['building_id']}")
-    db.flush()
-    for d in data["devices"]:
-        row = db.get(Device, d["device_id"])
-        threshold = Decimal(str(d["power_threshold_kw"]))
-        if row is None:
-            db.add(Device(**{**d, "power_threshold_kw": threshold})); diff["inserted"].append(f"device:{d['device_id']}")
-            continue
-        changed = [k for k in ("building_id", "name", "enabled", "period_seconds") if getattr(row, k) != d[k]]
-        if row.power_threshold_kw != threshold:
-            changed.append("power_threshold_kw")
-        # Baseline: đổi building/chu kỳ/ngưỡng sau khi đã có dữ liệu cần dataset mới (không diễn giải lại dữ liệu cũ).
-        frozen = [k for k in ("building_id", "period_seconds", "power_threshold_kw") if k in changed]
-        if frozen:
-            n = db.scalar(select(func.count()).select_from(Reading).where(Reading.device_id == row.device_id))
-            if n:
-                raise SeedError(f"không đổi {', '.join(frozen)} của {row.device_id}: đã có {n} readings (cần dataset mới)")
-        if changed:
-            for k in changed:
-                setattr(row, k, threshold if k == "power_threshold_kw" else d[k])
-            diff["updated"].append(f"device:{d['device_id']}({','.join(changed)})")
-        else:
-            diff["unchanged"].append(f"device:{d['device_id']}")
+    try:
+        for b in data["buildings"]:
+            row = db.get(Building, b["building_id"])
+            if row is None:
+                db.add(Building(**b)); diff["inserted"].append(f"building:{b['building_id']}")
+            elif row.name != b["name"]:
+                row.name = b["name"]; diff["updated"].append(f"building:{b['building_id']}")
+            else:
+                diff["unchanged"].append(f"building:{b['building_id']}")
+        db.flush()
+        # Khóa theo thứ tự device_id cố định để hai lần seed song song không deadlock; populate_existing để so sánh
+        # với giá trị đã commit mới nhất, không phải bản cũ trong session. Lệnh đếm bên dưới chạy SAU khi có khóa nên
+        # (READ COMMITTED) thấy reading mà worker vừa commit.
+        ids = [d["device_id"] for d in data["devices"]]
+        locked = {r.device_id: r for r in db.scalars(
+            select(Device).where(Device.device_id.in_(ids)).order_by(Device.device_id)
+            .with_for_update().execution_options(populate_existing=True))}
+        for d in data["devices"]:
+            row = locked.get(d["device_id"])
+            threshold = Decimal(str(d["power_threshold_kw"]))
+            if row is None:
+                db.add(Device(**{**d, "power_threshold_kw": threshold})); diff["inserted"].append(f"device:{d['device_id']}")
+                continue
+            changed = [k for k in ("building_id", "name", "enabled", "period_seconds") if getattr(row, k) != d[k]]
+            if row.power_threshold_kw != threshold:
+                changed.append("power_threshold_kw")
+            # Baseline: đổi building/chu kỳ/ngưỡng sau khi đã có dữ liệu cần dataset mới (không diễn giải lại dữ liệu cũ).
+            frozen = [k for k in ("building_id", "period_seconds", "power_threshold_kw") if k in changed]
+            if frozen:
+                n = db.scalar(select(func.count()).select_from(Reading).where(Reading.device_id == row.device_id))
+                if n:
+                    raise SeedError(f"không đổi {', '.join(frozen)} của {row.device_id}: đã có {n} readings (cần dataset mới)")
+            if changed:
+                for k in changed:
+                    setattr(row, k, threshold if k == "power_threshold_kw" else d[k])
+                diff["updated"].append(f"device:{d['device_id']}({','.join(changed)})")
+            else:
+                diff["unchanged"].append(f"device:{d['device_id']}")
+    except SeedError:
+        db.rollback()
+        raise
     db.commit()
     return diff
 
