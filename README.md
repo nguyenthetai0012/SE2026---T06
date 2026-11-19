@@ -73,6 +73,8 @@ Trong Issue, tài liệu và PR, tách rõ **yêu cầu đã xác nhận**, **gi
 
 ## Cài đặt và chạy
 
+Xem [Hướng dẫn Local Development và QA Infrastructure](docs/architecture/local-development.md) để khởi tạo và kiểm tra hạ tầng QA cục bộ.
+
 Chưa có hướng dẫn chạy vì chưa có implementation và stack được duyệt. Các lệnh cài đặt, cấu hình, chạy simulator, chạy ứng dụng và kiểm thử sẽ được bổ sung sau khi kiểm chứng trong repo.
 
 ## Nguồn

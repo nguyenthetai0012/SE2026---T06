@@ -1,0 +1,35 @@
+name: app05-ngoc-qa
+
+services:
+  db:
+    image: postgres:16.15-alpine
+    environment:
+      POSTGRES_DB: app05_qa
+      POSTGRES_USER: app05_qa
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run python3 tools/scripts/dev.py init first}
+      TZ: UTC
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U app05_qa -d app05_qa']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    # No host database port; application containers use db:5432.
+
+  mqtt:
+    image: eclipse-mosquitto:2.0.22
+    ports:
+      - '127.0.0.1:${MQTT_PORT:-1883}:1883'
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mqtt_data:/mosquitto/data
+    healthcheck:
+      test: [CMD, mosquitto_pub, -h, localhost, -t, qa/health, -n, -q, '1']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  postgres_data:
+  mqtt_data:
