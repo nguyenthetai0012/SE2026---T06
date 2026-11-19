@@ -234,3 +234,37 @@ def test_handle_acks_rejected_and_counts_by_code(db, engine):
     assert handle(engine, stats, A01, b"not json", False) is True
     assert handle(engine, stats, A01, json.dumps(power(), ).encode(), False, clock=lambda: utc("2026-10-27T00:03:00Z")) is True
     assert stats.counts["rejected:INVALID_JSON"] == 1 and stats.counts["accepted"] == 1
+
+
+def test_disabled_rejects_new_reading_but_preserves_existing_history(db, client):
+    previous = power("2026-10-27T00:01:00Z", value=12)
+    assert send(db, previous, received="2026-10-27T00:01:01Z").status == "accepted"
+    before = counts(db)
+    device = db.get(Device, "A-01")
+    previous_seen, previous_event = device.last_seen, device.latest_event_time
+    device.enabled = False
+    db.commit()
+
+    rejected = power("2026-10-27T00:02:00Z", value=25)
+    result = send(db, rejected, received="2026-10-27T00:02:01Z")
+    assert (result.status, result.code) == ("rejected", "DEVICE_DISABLED")
+    assert counts(db) == before == (1, 1)
+    assert db.get(Reading, rejected["message_id"]) is None
+    db.expire_all()
+    device = db.get(Device, "A-01")
+    assert (device.last_seen, device.latest_event_time) == (previous_seen, previous_event)
+    response = client.get("/api/v1/devices/A-01/readings", params={
+        "metric": "power_kw", "start": "2026-10-27T00:00:00Z", "end": "2026-10-27T00:03:00Z"})
+    assert response.status_code == 200
+    assert [item["message_id"] for item in response.json()["data"]] == [previous["message_id"]]
+
+
+def test_disabled_replay_is_rejected_without_changing_history(db):
+    previous = power(value=12)
+    assert send(db, previous).status == "accepted"
+    device = db.get(Device, "A-01")
+    device.enabled = False
+    db.commit()
+    result = send(db, previous)
+    assert (result.status, result.code) == ("rejected", "DEVICE_DISABLED")
+    assert counts(db) == (1, 1)

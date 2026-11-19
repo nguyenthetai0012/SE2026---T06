@@ -37,6 +37,8 @@ def _apply(db: Session, msg: Message, received_at: datetime) -> Result:
     dev = db.scalars(select(Device).where(Device.device_id == msg.device_id).with_for_update()).one_or_none()
     if dev is None or dev.building_id != msg.building_id:
         raise Rejected("UNKNOWN_DEVICE", "device_id/building_id không có trong registry")
+    if not dev.enabled:
+        raise Rejected("DEVICE_DISABLED", "thiết bị đã bị vô hiệu hóa")
 
     existing = db.get(Reading, msg.message_id)
     if existing is not None:
