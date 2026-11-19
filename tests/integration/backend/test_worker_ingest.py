@@ -268,3 +268,28 @@ def test_disabled_replay_is_rejected_without_changing_history(db):
     result = send(db, previous)
     assert (result.status, result.code) == ("rejected", "DEVICE_DISABLED")
     assert counts(db) == (1, 1)
+
+
+def _disable(db, device="A-01"):
+    db.get(Device, device).enabled = False
+    db.commit()
+
+
+def test_disabled_device_with_invalid_schema_reports_validation_error_first(db):
+    # Thứ tự contract: size/JSON/schema -> topic/registry; lỗi schema được báo trước DEVICE_DISABLED.
+    _disable(db)
+    seen = last_seen(db)
+    r = send(db, power(value="12"))
+    assert (r.status, r.code) == ("rejected", "INVALID_VALUE")
+    r = send(db, power(schema_version="2.0"))
+    assert (r.status, r.code) == ("rejected", "INVALID_SCHEMA_VERSION")
+    assert counts(db) == (0, 0) and last_seen(db) == seen
+
+
+def test_disabled_device_with_wrong_building_reports_unknown_device(db):
+    # Topic khớp payload nhưng mapping registry sai: UNKNOWN_DEVICE được kiểm tra trước enabled.
+    _disable(db)
+    seen = last_seen(db)
+    r = send(db, power(device="A-01", building="BLD-B"))
+    assert (r.status, r.code) == ("rejected", "UNKNOWN_DEVICE")
+    assert counts(db) == (0, 0) and last_seen(db) == seen
