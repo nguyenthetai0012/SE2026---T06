@@ -38,7 +38,7 @@ def main():
     if missing:
         print('BLOCKED: Backend chưa sẵn sàng. Thiếu: ' + ', '.join(missing), file=sys.stderr)
         return 2
-    for relative in ('src/backend', 'tests/integration/backend', 'docs/testing/fixtures', 'docs/contracts'):
+    for relative in ('src/backend', 'tests/integration/backend', 'docs/testing/fixtures', 'docs/contracts', 'src/simulator'):
         shutil.copytree(SOURCE / relative, WORK / relative, dirs_exist_ok=True,
                         ignore=shutil.ignore_patterns('.env', '.venv', '__pycache__', '.pytest_cache'))
     shutil.copytree('/extra-tests', WORK / 'tests/integration/backend', dirs_exist_ok=True,

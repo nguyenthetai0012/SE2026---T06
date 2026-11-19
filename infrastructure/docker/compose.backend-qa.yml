@@ -29,6 +29,7 @@ services:
       PYTHONDONTWRITEBYTECODE: '1'
       PIP_DISABLE_PIP_VERSION_CHECK: '1'
       QA_REPORT_DIR: /reports
+      REQUIRE_MQTT_BROKER: '1'
     volumes:
       - ${QA_SOURCE_ROOT:-../..}:/target:ro
       - ../../tests/integration/qa_backend:/extra-tests:ro

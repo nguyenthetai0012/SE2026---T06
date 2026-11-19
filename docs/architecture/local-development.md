@@ -207,3 +207,10 @@ The worker is under review in PR #41; Simulator #36 has not supplied an integrat
 ### Bounded load preparation
 
 An and Ngọc must agree an isolated test profile before running: registry, deterministic seed, explicit finite message count or duration, rate and maximum concurrency; start small and stop on errors. Save the generated message IDs and expected counts. After publisher completion, wait for the worker to drain with a bounded timeout; reconcile unique accepted IDs against database and API, accounting for deliberate duplicate and invalid inputs. Record sent, accepted, rejected, duplicates, pending and failures, throughput, ingest/API latency percentiles and resource usage, with environment, versions and commit SHAs. Mark the run inconclusive if pending messages or discrepancies remain. No throughput or latency SLA is established, and no load result is claimed here.
+
+
+## Pipeline test on the integration branch
+
+This branch combines the unmerged QA #35, worker #41 and Simulator #46 revisions for testing; it does not establish that those PRs have been merged. `python tools/scripts/dev.py init` followed by `python tools/scripts/backend_qa.py` runs the backend integration suite in a disposable PostgreSQL container. The QA container installs Mosquitto and requires its broker tests to run. The Simulator pipeline test sends normal, duplicate, invalid, late and out-of-order messages through the CLI, broker and worker, checks DB rows and flags and queries the Backend API application. The test uses fixed historical timestamps, so even the normal readings are late; it does not measure live latency or test the dashboard.
+
+`TEST_DATABASE_URL` in the runner points only to its disposable `app05_test` database; the backend tests drop its public schema. Do not aim them at an existing or shared database. No local execution or CI result is implied by this instruction. The architecture says disabled devices are rejected, but worker #41 accepts readings for disabled devices; Simulator #46 sends only for enabled devices. Tài and An need to resolve that discrepancy before treating it as an agreed rule.

@@ -44,7 +44,7 @@ jobs:
         run: python3 tools/scripts/dev.py down
 
   backend:
-    name: Backend migration and API integration
+    name: Backend API and MQTT pipeline integration
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -52,7 +52,7 @@ jobs:
         with:
           persist-credentials: false
       - run: python3 tools/scripts/dev.py init
-      - name: Test the real Backend in a disposable database
+      - name: Test Backend and Simulator through a real broker in a disposable database
         run: python3 tools/scripts/backend_qa.py
       - name: Save test evidence
         if: always()
@@ -68,5 +68,5 @@ jobs:
           -f infrastructure/docker/compose.yml
           -f infrastructure/docker/compose.backend-qa.yml down
 
-# MQTT end-to-end cannot be enabled until the real worker is supplied.
-# A successful fixtures/infra job is NOT evidence of worker ingestion success.
+# This integration branch includes unmerged PRs #35, #41 and #46.
+# Infrastructure smoke alone is not evidence of application ingestion.
