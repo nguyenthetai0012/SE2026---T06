@@ -156,3 +156,29 @@ def test_live_retained_message_rejected_on_subscribe(worker, broker, engine):
     worker.start()
     assert wait_for(engine, "select count(*) from readings", 0, timeout=2.0) == 0
     assert "reject RETAINED_MESSAGE" in worker.stop()
+
+
+def test_live_disabled_rejects_new_reading_and_history_remains(worker, broker, engine, client):
+    worker.start()
+    before = msg(value=12, event_time="2020-01-01T00:01:00Z")
+    publish(broker, [(topic(before), before, False)])
+    assert wait_for(engine, "select count(*) from readings", 1) == 1
+    assert wait_for(engine, "select count(*) from alerts", 1) == 1
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE devices SET enabled=false WHERE device_id='A-01'"))
+        seen = connection.execute(text("SELECT last_seen, latest_event_time FROM devices WHERE device_id='A-01'")).one()
+    rejected = msg(value=25, event_time="2020-01-01T00:02:00Z")
+    publish(broker, [(topic(rejected), rejected, False)])
+    # A valid message on another device provides a processing barrier on this worker.
+    barrier = msg(device="B-01", building="BLD-B", value=3, event_time="2020-01-01T00:03:00Z")
+    publish(broker, [(topic(barrier), barrier, False)])
+    assert wait_for(engine, "select count(*) from readings", 2) == 2
+    log = worker.stop()
+    assert "reject DEVICE_DISABLED" in log
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT count(*) FROM alerts")).scalar_one() == 1
+        assert connection.execute(text("SELECT last_seen, latest_event_time FROM devices WHERE device_id='A-01'")).one() == seen
+    response = client.get('/api/v1/devices/A-01/readings', params={
+        'metric': 'power_kw', 'start': '2020-01-01T00:00:00Z', 'end': '2020-01-01T00:04:00Z'})
+    assert response.status_code == 200
+    assert [row['message_id'] for row in response.json()['data']] == [before['message_id']]
