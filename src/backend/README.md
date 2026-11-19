@@ -26,9 +26,11 @@ python3.12 -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
 export DATABASE_URL='postgresql+psycopg://USER:PASSWORD@localhost:5432/energy'   # xem .env.example
 alembic upgrade head                      # tạo schema
-python -m app.seed                        # nạp registry từ seed/registry.json, chạy lại không nhân bản
+python -m app.seed                        # nạp registry từ seed/registry.json, chạy lại không nhân bản; không đổi building/chu kỳ/ngưỡng của device đã có dữ liệu
 uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000
 ```
+
+Seed có thể chạy khi worker đang ingest: seed khóa dòng device (`SELECT ... FOR UPDATE`) trước khi kiểm tra readings, nên mọi đường ghi readings cũng phải khóa dòng device trong cùng transaction (worker chờ tối đa `statement_timeout`).
 
 Windows (PowerShell):
 

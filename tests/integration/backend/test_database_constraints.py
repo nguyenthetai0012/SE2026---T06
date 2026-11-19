@@ -117,6 +117,32 @@ def test_seed_refuses_to_move_device_with_history(db, fixture_data):
     db.rollback()
 
 
+@pytest.mark.parametrize("field,value", [("period_seconds", 30), ("power_threshold_kw", 20)])
+def test_seed_refuses_to_change_period_or_threshold_with_history(db, fixture_data, field, value):
+    load_fixture(db, fixture_data)
+    data = load_registry(SEED_FILE)
+    data["devices"][0][field] = value
+    with pytest.raises(SeedError, match=field):
+        apply_seed(db, data)
+    db.rollback()
+    assert getattr(db.get(Device, data["devices"][0]["device_id"]), field) != value
+
+
+def test_seed_allows_changing_period_and_threshold_without_history(db):
+    data = load_registry(SEED_FILE)
+    data["devices"][0]["period_seconds"] = 30
+    data["devices"][0]["power_threshold_kw"] = 20
+    diff = apply_seed(db, data)
+    assert diff["updated"] == ["device:A-01(period_seconds,power_threshold_kw)"]
+
+
+def test_seed_allows_toggling_enabled_with_history(db, fixture_data):
+    load_fixture(db, fixture_data)
+    data = load_registry(SEED_FILE)
+    data["devices"][1]["enabled"] = False
+    assert apply_seed(db, data)["updated"] == ["device:A-02(enabled)"]
+
+
 @pytest.mark.parametrize("mutate,msg", [
     (lambda d: d["devices"].append(dict(d["devices"][0])), "trùng device_id"),
     (lambda d: d["devices"][0].update(building_id="BLD-X"), "device không hợp lệ"),
