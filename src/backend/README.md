@@ -96,7 +96,7 @@ Quyết định triển khai contract chưa nói (cần nhóm xác nhận):
 
 1. Mã lỗi ngoài INVALID_VALUE/MESSAGE_ID_CONFLICT/READING_CONFLICT/INTERVAL_OVERLAP là tên nội bộ (`UNKNOWN_FIELD`, `MISSING_FIELD`, `INVALID_JSON`, `TOPIC_MISMATCH`, `UNKNOWN_DEVICE`, `FUTURE_EVENT_TIME`...).
 2. Lỗi DB: không ACK rồi ngắt kết nối để broker gửi lại (session bền); bản bị từ chối vẫn được ACK.
-3. Device `enabled=false` vẫn nhận và lưu reading (summary đã loại khỏi tổng); contract chưa nói reject.
+3. Device `enabled=false`: worker từ chối bản tin tại bước registry với mã nội bộ `DEVICE_DISABLED`, trước dedup; không thay reading/alert/last_seen. Lịch sử đã lưu vẫn truy vấn được. Thay đổi trạng thái và ingestion được tuần tự theo khóa dòng thiết bị của PostgreSQL; kết quả phụ thuộc transaction nào lấy khóa trước, không dựa trên event_time. Đề xuất MVP đang chờ Tài review: khi bật lại, bản tin tồn đọng được xử lý bình thường theo validation, dedup, late và out-of-order. Worker không lưu lịch sử bật/tắt và không đối chiếu event_time với các lần đổi trạng thái; do đó bản tin được tạo trong lúc disabled vẫn có thể được nhận nếu chỉ tới sau khi bật lại.
 4. `value` làm tròn về 9 chữ số thập phân (kiểu `Numeric(24,9)`) trước khi so sánh duplicate.
 5. `alert_id` = UUIDv5 của `alert:<message_id>`; `detected_at` = `received_at`.
 
