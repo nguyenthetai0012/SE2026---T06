@@ -284,21 +284,23 @@ def test_reenabled_device_processes_backlog_and_preserves_dedup_and_history(db, 
     assert result.status == "rejected" and counts(db) == (1, 1)
     assert send(db, original).code == "DEVICE_DISABLED"
 
+    # Prepare the queued payload while disabled; its first delivery occurs after re-enabling.
+    backlog = power("2026-10-27T00:03:00Z", value=15)
     device = db.get(Device, "A-01")
     device.enabled = True
     db.commit()
-    # Model a reading created while disabled and first delivered after re-enabling.
-    backlog = power("2026-10-27T00:01:30Z", value=15)
+    later = power("2026-10-27T00:04:00Z", value=5)
+    assert send(db, later, received="2026-10-27T00:04:01Z").status == "accepted"
     assert send(db, backlog, received="2026-10-27T00:10:00Z").status == "accepted"
     row = db.get(Reading, backlog["message_id"])
     assert row.is_late is True and row.is_out_of_order is True
     assert send(db, backlog, received="2026-10-27T00:11:00Z").status == "duplicate"
     assert send(db, original, received="2026-10-27T00:11:00Z").status == "duplicate"
-    assert counts(db) == (2, 2)
+    assert counts(db) == (3, 2)
     response = client.get("/api/v1/devices/A-01/readings", params={
-        "metric": "power_kw", "start": "2026-10-27T00:00:00Z", "end": "2026-10-27T00:03:00Z"})
+        "metric": "power_kw", "start": "2026-10-27T00:00:00Z", "end": "2026-10-27T00:05:00Z"})
     assert response.status_code == 200
-    assert [item["message_id"] for item in response.json()["data"]] == [backlog["message_id"], original["message_id"]]
+    assert [item["message_id"] for item in response.json()["data"]] == [original["message_id"], backlog["message_id"], later["message_id"]]
 
 
 @pytest.mark.parametrize("enabled,expected", [(False, "rejected"), (True, "accepted")])
