@@ -5,10 +5,13 @@ Không cần broker: kiểm thẳng worker.ingest.ingest() và worker.consumer.h
 from __future__ import annotations
 
 import json
+import time
+from concurrent.futures import ThreadPoolExecutor
+from queue import Queue
 from datetime import datetime, timedelta
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
@@ -268,3 +271,69 @@ def test_disabled_replay_is_rejected_without_changing_history(db):
     result = send(db, previous)
     assert (result.status, result.code) == ("rejected", "DEVICE_DISABLED")
     assert counts(db) == (1, 1)
+
+
+def test_reenabled_device_processes_backlog_and_preserves_dedup_and_history(db, client):
+    original = power("2026-10-27T00:02:00Z", value=12)
+    assert send(db, original, received="2026-10-27T00:02:01Z").status == "accepted"
+    device = db.get(Device, "A-01")
+    device.enabled = False
+    db.commit()
+    old = power("2026-10-27T00:01:00Z", value=14)
+    assert (result := send(db, old, received="2026-10-27T00:03:00Z")).code == "DEVICE_DISABLED"
+    assert result.status == "rejected" and counts(db) == (1, 1)
+    assert send(db, original).code == "DEVICE_DISABLED"
+
+    device = db.get(Device, "A-01")
+    device.enabled = True
+    db.commit()
+    # Model a reading created while disabled and first delivered after re-enabling.
+    backlog = power("2026-10-27T00:01:30Z", value=15)
+    assert send(db, backlog, received="2026-10-27T00:10:00Z").status == "accepted"
+    row = db.get(Reading, backlog["message_id"])
+    assert row.is_late is True and row.is_out_of_order is True
+    assert send(db, backlog, received="2026-10-27T00:11:00Z").status == "duplicate"
+    assert send(db, original, received="2026-10-27T00:11:00Z").status == "duplicate"
+    assert counts(db) == (2, 2)
+    response = client.get("/api/v1/devices/A-01/readings", params={
+        "metric": "power_kw", "start": "2026-10-27T00:00:00Z", "end": "2026-10-27T00:03:00Z"})
+    assert response.status_code == 200
+    assert [item["message_id"] for item in response.json()["data"]] == [backlog["message_id"], original["message_id"]]
+
+
+@pytest.mark.parametrize("enabled,expected", [(False, "rejected"), (True, "accepted")])
+def test_concurrent_registry_update_is_observed_after_row_lock(db, engine, enabled, expected):
+    # Hold the state update uncommitted while a separate worker transaction attempts ingest.
+    db.commit()
+    pid_queue = Queue()
+    payload = power(value=12)
+
+    def run_ingest():
+        with Session(engine) as session:
+            pid_queue.put(session.scalar(text("SELECT pg_backend_pid()")))
+            return send(session, payload)
+
+    with engine.connect() as updater, ThreadPoolExecutor(max_workers=1) as pool:
+        tx = updater.begin()
+        try:
+            updater.execute(text("UPDATE devices SET enabled=:enabled WHERE device_id='A-01'"), {"enabled": enabled})
+            future = pool.submit(run_ingest)
+            pid = pid_queue.get(timeout=5)
+            deadline = time.monotonic() + 5
+            with engine.connect() as observer:
+                while time.monotonic() < deadline:
+                    if observer.scalar(text("SELECT cardinality(pg_blocking_pids(:pid))"), {"pid": pid}):
+                        break
+                    time.sleep(0.05)
+                else:
+                    pytest.fail("worker did not wait for registry row lock")
+            tx.commit()
+            result = future.result(timeout=10)
+        finally:
+            if tx.is_active:
+                tx.rollback()
+    assert result.status == expected
+    if not enabled:
+        assert result.code == "DEVICE_DISABLED"
+    with Session(engine) as verify:
+        assert counts(verify) == ((1, 1) if enabled else (0, 0))
